@@ -2,12 +2,13 @@
 	const { registerPlugin } = wp.plugins;
 	const { PluginDocumentSettingPanel } = wp.editPost;
 	const { CheckboxControl } = wp.components;
-	const { useSelect, useDispatch } = wp.data;
+	const { useSelect, useDispatch, useRegistry } = wp.data;
 	const { __ } = wp.i18n;
-	const { useState, useEffect, useCallback, useRef } = wp.element;
+	const { useState, useEffect, useCallback } = wp.element;
 	const apiFetch = wp.apiFetch;
 
 	const AuthorGroupsPanel = () => {
+		const registry = useRegistry();
 		const { meta, postType } = useSelect((select) => {
 			return {
 				meta: select('core/editor').getEditedPostAttribute('meta'),
@@ -15,21 +16,17 @@
 			};
 		}, []);
 
+		const { editPost } = useDispatch('core/editor');
+
 		// Get current selected users - expect array of user IDs
-		const currentSelectedUsers = meta?.['wp_authors_and_groups_selected_users'] || [];
+		const selectedUsers = Array.isArray(meta?.['wp_authors_and_groups_selected_users'])
+			? meta['wp_authors_and_groups_selected_users']
+			: [];
 
 		// Get current selected groups - expect array of group term IDs
-		const currentSelectedGroups = meta?.['wp_authors_and_groups_selected_groups'] || [];
-
-		// State for selected user IDs
-		const [selectedUsers, setSelectedUsers] = useState(
-			Array.isArray(currentSelectedUsers) ? currentSelectedUsers : []
-		);
-
-		// State for selected group IDs
-		const [selectedGroups, setSelectedGroups] = useState(
-			Array.isArray(currentSelectedGroups) ? currentSelectedGroups : []
-		);
+		const selectedGroups = Array.isArray(meta?.['wp_authors_and_groups_selected_groups'])
+			? meta['wp_authors_and_groups_selected_groups']
+			: [];
 
 		// State for users list
 		const [users, setUsers] = useState([]);
@@ -69,24 +66,48 @@
 
 		// Handle checkbox change for groups
 		const handleGroupToggle = useCallback((groupId, isChecked) => {
-			setSelectedGroups((prev) => {
-				if (isChecked) {
-					return prev.includes(groupId) ? prev : [...prev, groupId];
-				} else {
-					return prev.filter((id) => id !== groupId);
-				}
+			// Get the latest meta from the store
+			const currentMeta = registry.select('core/editor').getEditedPostAttribute('meta');
+			const currentGroups = Array.isArray(currentMeta?.['wp_authors_and_groups_selected_groups'])
+				? currentMeta['wp_authors_and_groups_selected_groups']
+				: [];
+
+			const newGroups = isChecked
+				? currentGroups.includes(groupId)
+					? currentGroups
+					: [...currentGroups, groupId]
+				: currentGroups.filter((id) => id !== groupId);
+
+			// Save to post meta immediately
+			editPost({
+				meta: {
+					...currentMeta,
+					wp_authors_and_groups_selected_groups: newGroups,
+				},
 			});
-		}, []);
+		}, [registry, editPost]);
 
 		const handleUserToggle = useCallback((userId, isChecked) => {
-			setSelectedUsers((prev) => {
-				if (isChecked) {
-					return prev.includes(userId) ? prev : [...prev, userId];
-				} else {
-					return prev.filter((id) => id !== userId);
-				}
+			// Get the latest meta from the store
+			const currentMeta = registry.select('core/editor').getEditedPostAttribute('meta');
+			const currentUsers = Array.isArray(currentMeta?.['wp_authors_and_groups_selected_users'])
+				? currentMeta['wp_authors_and_groups_selected_users']
+				: [];
+
+			const newUsers = isChecked
+				? currentUsers.includes(userId)
+					? currentUsers
+					: [...currentUsers, userId]
+				: currentUsers.filter((id) => id !== userId);
+
+			// Save to post meta immediately
+			editPost({
+				meta: {
+					...currentMeta,
+					wp_authors_and_groups_selected_users: newUsers,
+				},
 			});
-		}, []);
+		}, [registry, editPost]);
 
 		// Only show for posts and pages
 		if (postType !== 'post' && postType !== 'page') {

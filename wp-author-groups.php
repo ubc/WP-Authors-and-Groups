@@ -69,9 +69,17 @@ function register_meta_fields() {
 			$post_type,
 			'wp_authors_and_groups_selected_users',
 			array(
-				'show_in_rest'      => true,
+				'show_in_rest'      => array(
+					'schema' => array(
+						'type'  => 'array',
+						'items' => array(
+							'type' => 'integer',
+						),
+					),
+				),
 				'single'            => true,
 				'type'              => 'array',
+				'default'           => array(),
 				'sanitize_callback' => function ( $value ) {
 					if ( ! is_array( $value ) ) {
 						return array();
@@ -88,9 +96,17 @@ function register_meta_fields() {
 			$post_type,
 			'wp_authors_and_groups_selected_groups',
 			array(
-				'show_in_rest'      => true,
+				'show_in_rest'      => array(
+					'schema' => array(
+						'type'  => 'array',
+						'items' => array(
+							'type' => 'integer',
+						),
+					),
+				),
 				'single'            => true,
 				'type'              => 'array',
+				'default'           => array(),
 				'sanitize_callback' => function ( $value ) {
 					if ( ! is_array( $value ) ) {
 						return array();
