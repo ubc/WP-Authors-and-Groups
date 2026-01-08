@@ -1,0 +1,4 @@
+
+.editor-sidebar .editor-post-panel__row:has(.editor-post-author__panel-toggle) {
+    display: none;
+}

@@ -47,6 +47,13 @@ function enqueue_scripts() {
 		array(),
 		filemtime( plugin_dir_path( __FILE__ ) . '/build/index.css' )
 	);
+
+	wp_enqueue_style(
+		'wp-authors-and-groups-editor-style',
+		plugin_dir_url( __FILE__ ) . '/css/editor.css',
+		array(),
+		filemtime( plugin_dir_path( __FILE__ ) . '/css/editor.css' )
+	);
 }
 
 /**
