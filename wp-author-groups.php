@@ -27,7 +27,7 @@ add_action( 'rest_api_init', __NAMESPACE__ . '\\register_rest_routes' );
 function enqueue_scripts() {
 	wp_enqueue_script(
 		'wp-authors-and-groups-script',
-		plugin_dir_url( __FILE__ ) . '/build/index.js',
+		plugin_dir_url( __FILE__ ) . '/build/editor.js',
 		array(
 			'wp-plugins',
 			'wp-edit-post',
@@ -37,15 +37,15 @@ function enqueue_scripts() {
 			'wp-i18n',
 			'wp-api-fetch',
 		),
-		filemtime( plugin_dir_path( __FILE__ ) . '/build/index.js' ),
+		filemtime( plugin_dir_path( __FILE__ ) . '/build/editor.js' ),
 		true
 	);
 
 	wp_enqueue_style(
 		'wp-authors-and-groups-style',
-		plugin_dir_url( __FILE__ ) . '/build/index.css',
+		plugin_dir_url( __FILE__ ) . '/build/editor.css',
 		array(),
-		filemtime( plugin_dir_path( __FILE__ ) . '/build/index.css' )
+		filemtime( plugin_dir_path( __FILE__ ) . '/build/editor.css' )
 	);
 
 	wp_enqueue_style(

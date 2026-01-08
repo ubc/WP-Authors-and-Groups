@@ -5,8 +5,8 @@
     "main": "index.js",
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1",
-        "start": "wp-scripts start index.js",
-        "build": "wp-scripts build index.js"
+        "start": "wp-scripts start js/editor.js",
+        "build": "wp-scripts build js/editor.js"
     },
     "author": "Kelvin Xu",
     "license": "GPL-2.0-only",
