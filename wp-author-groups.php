@@ -17,6 +17,7 @@ namespace UBC\CTLT\Block\AuthorGroups;
 
 add_action( 'enqueue_block_editor_assets', __NAMESPACE__ . '\\enqueue_scripts', 99 );
 add_action( 'init', __NAMESPACE__ . '\\register_meta_fields' );
+add_action( 'rest_api_init', __NAMESPACE__ . '\\register_rest_routes' );
 
 	/**
 	 * Enqueues the necessary scripts and styles for the editor.
@@ -34,6 +35,7 @@ function enqueue_scripts() {
 			'wp-data',
 			'wp-element',
 			'wp-i18n',
+			'wp-api-fetch',
 		),
 		filemtime( plugin_dir_path( __FILE__ ) . '/build/index.js' ),
 		true
@@ -58,15 +60,91 @@ function register_meta_fields() {
 	foreach ( $post_types as $post_type ) {
 		register_post_meta(
 			$post_type,
-			'wp_authors_and_groups_dummy_setting',
+			'wp_authors_and_groups_selected_users',
 			array(
 				'show_in_rest'  => true,
 				'single'        => true,
-				'type'          => 'string',
+				'type'          => 'array',
+				'auth_callback' => function () {
+					return current_user_can( 'edit_posts' );
+				},
+			)
+		);
+
+		register_post_meta(
+			$post_type,
+			'wp_authors_and_groups_selected_groups',
+			array(
+				'show_in_rest'  => true,
+				'single'        => true,
+				'type'          => 'array',
 				'auth_callback' => function () {
 					return current_user_can( 'edit_posts' );
 				},
 			)
 		);
 	}
+}
+
+/**
+ * Registers REST API routes for user groups.
+ *
+ * @return void
+ */
+function register_rest_routes() {
+	register_rest_route(
+		'wp-authors-and-groups/v1',
+		'/user-groups',
+		array(
+			'methods'             => 'GET',
+			'callback'            => __NAMESPACE__ . '\\get_user_groups',
+			'permission_callback' => function () {
+				return current_user_can( 'edit_posts' );
+			},
+		)
+	);
+}
+
+/**
+ * Gets user groups from wp-user-groups plugin.
+ *
+ * @return WP_REST_Response|WP_Error
+ */
+function get_user_groups() {
+	// Check if wp-user-groups plugin is active.
+	if ( ! taxonomy_exists( 'user-group' ) ) {
+		return new \WP_Error(
+			'user_groups_not_found',
+			__( 'User groups taxonomy not found. Please ensure WP User Groups plugin is active.', 'wp-authors-and-groups' ),
+			array( 'status' => 404 )
+		);
+	}
+
+	// Get terms from user-group taxonomy.
+	$terms = get_terms(
+		array(
+			'taxonomy'   => 'user-group',
+			'hide_empty' => false,
+			'orderby'    => 'name',
+			'order'      => 'ASC',
+		)
+	);
+
+	if ( is_wp_error( $terms ) ) {
+		return $terms;
+	}
+
+	// Format terms for REST API response.
+	$groups = array_map(
+		function ( $term ) {
+			return array(
+				'id'   => $term->term_id,
+				'name' => $term->name,
+				'slug' => $term->slug,
+			);
+		},
+		$terms
+	);
+
+	return rest_ensure_response( $groups );
 }
