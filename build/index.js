@@ -115,7 +115,9 @@ __webpack_require__.r(__webpack_exports__);
   } = wp.i18n;
   const {
     useState,
-    useEffect
+    useEffect,
+    useCallback,
+    useRef
   } = wp.element;
   const apiFetch = wp.apiFetch;
   const AuthorGroupsPanel = () => {
@@ -128,9 +130,6 @@ __webpack_require__.r(__webpack_exports__);
         postType: select('core/editor').getCurrentPostType()
       };
     }, []);
-    const {
-      editPost
-    } = useDispatch('core/editor');
 
     // Get current selected users - expect array of user IDs
     const currentSelectedUsers = meta?.['wp_authors_and_groups_selected_users'] || [];
@@ -176,65 +175,25 @@ __webpack_require__.r(__webpack_exports__);
       });
     }, []);
 
-    // Sync state when meta changes (e.g., when loading a different post)
-    useEffect(() => {
-      const metaValue = Array.isArray(currentSelectedUsers) ? currentSelectedUsers : [];
-      if (JSON.stringify(metaValue) !== JSON.stringify(selectedUsers)) {
-        setSelectedUsers(metaValue);
-      }
-    }, [currentSelectedUsers]);
-    useEffect(() => {
-      const metaValue = Array.isArray(currentSelectedGroups) ? currentSelectedGroups : [];
-      if (JSON.stringify(metaValue) !== JSON.stringify(selectedGroups)) {
-        setSelectedGroups(metaValue);
-      }
-    }, [currentSelectedGroups]);
-
-    // Update meta when selected users change
-    useEffect(() => {
-      const currentMeta = Array.isArray(currentSelectedUsers) ? currentSelectedUsers : [];
-      if (JSON.stringify(currentMeta) !== JSON.stringify(selectedUsers)) {
-        editPost({
-          meta: {
-            ...meta,
-            wp_authors_and_groups_selected_users: selectedUsers
-          }
-        });
-      }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedUsers]);
-
-    // Update meta when selected groups change
-    useEffect(() => {
-      const currentMeta = Array.isArray(currentSelectedGroups) ? currentSelectedGroups : [];
-      if (JSON.stringify(currentMeta) !== JSON.stringify(selectedGroups)) {
-        editPost({
-          meta: {
-            ...meta,
-            wp_authors_and_groups_selected_groups: selectedGroups
-          }
-        });
-      }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedGroups]);
-
-    // Handle checkbox change for users
-    const handleUserToggle = (userId, isChecked) => {
-      if (isChecked) {
-        setSelectedUsers([...selectedUsers, userId]);
-      } else {
-        setSelectedUsers(selectedUsers.filter(id => id !== userId));
-      }
-    };
-
     // Handle checkbox change for groups
-    const handleGroupToggle = (groupId, isChecked) => {
-      if (isChecked) {
-        setSelectedGroups([...selectedGroups, groupId]);
-      } else {
-        setSelectedGroups(selectedGroups.filter(id => id !== groupId));
-      }
-    };
+    const handleGroupToggle = useCallback((groupId, isChecked) => {
+      setSelectedGroups(prev => {
+        if (isChecked) {
+          return prev.includes(groupId) ? prev : [...prev, groupId];
+        } else {
+          return prev.filter(id => id !== groupId);
+        }
+      });
+    }, []);
+    const handleUserToggle = useCallback((userId, isChecked) => {
+      setSelectedUsers(prev => {
+        if (isChecked) {
+          return prev.includes(userId) ? prev : [...prev, userId];
+        } else {
+          return prev.filter(id => id !== userId);
+        }
+      });
+    }, []);
 
     // Only show for posts and pages
     if (postType !== 'post' && postType !== 'page') {

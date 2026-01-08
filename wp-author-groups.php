@@ -69,10 +69,16 @@ function register_meta_fields() {
 			$post_type,
 			'wp_authors_and_groups_selected_users',
 			array(
-				'show_in_rest'  => true,
-				'single'        => true,
-				'type'          => 'array',
-				'auth_callback' => function () {
+				'show_in_rest'      => true,
+				'single'            => true,
+				'type'              => 'array',
+				'sanitize_callback' => function ( $value ) {
+					if ( ! is_array( $value ) ) {
+						return array();
+					}
+					return array_map( 'absint', $value );
+				},
+				'auth_callback'     => function () {
 					return current_user_can( 'edit_posts' );
 				},
 			)
@@ -82,10 +88,16 @@ function register_meta_fields() {
 			$post_type,
 			'wp_authors_and_groups_selected_groups',
 			array(
-				'show_in_rest'  => true,
-				'single'        => true,
-				'type'          => 'array',
-				'auth_callback' => function () {
+				'show_in_rest'      => true,
+				'single'            => true,
+				'type'              => 'array',
+				'sanitize_callback' => function ( $value ) {
+					if ( ! is_array( $value ) ) {
+						return array();
+					}
+					return array_map( 'absint', $value );
+				},
+				'auth_callback'     => function () {
 					return current_user_can( 'edit_posts' );
 				},
 			)
