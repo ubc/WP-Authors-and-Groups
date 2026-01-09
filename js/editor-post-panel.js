@@ -1,3 +1,12 @@
+/**
+ * WordPress Authors and Groups Editor Panel
+ *
+ * Provides a document settings panel in the block editor for selecting
+ * authors and user groups for posts and pages.
+ *
+ * @package wp-authors-and-groups
+ */
+
 (function (wp) {
 	const { registerPlugin } = wp.plugins;
 	const { PluginDocumentSettingPanel } = wp.editPost;
@@ -7,12 +16,23 @@
 	const { useState, useEffect, useCallback } = wp.element;
 	const apiFetch = wp.apiFetch;
 
+	/**
+	 * Author Groups Panel Component
+	 *
+	 * Renders a document settings panel with checkboxes for selecting
+	 * user groups and individual users as authors.
+	 *
+	 * @return {JSX.Element|null} The panel component or null if not applicable.
+	 */
 	const AuthorGroupsPanel = () => {
 		const registry = useRegistry();
 		const { meta, postType } = useSelect((select) => {
+			const editor = select('core/editor');
 			return {
-				meta: select('core/editor').getEditedPostAttribute('meta'),
-				postType: select('core/editor').getCurrentPostType(),
+				meta: editor.getEditedPostAttribute('meta'),
+				postType: editor.getCurrentPostType(),
+				author: editor.getEditedPostAttribute('author'),
+				postId: editor.getCurrentPostId(),
 			};
 		}, []);
 
@@ -42,10 +62,11 @@
 				path: '/wp/v2/users?per_page=100&orderby=name&order=asc',
 			})
 				.then((fetchedUsers) => {
-					setUsers(fetchedUsers);
+					setUsers(Array.isArray(fetchedUsers) ? fetchedUsers : []);
 					setIsLoadingUsers(false);
 				})
-				.catch(() => {
+				.catch((error) => {
+					// Silently handle error - users list will remain empty
 					setIsLoadingUsers(false);
 				});
 		}, []);
@@ -56,15 +77,60 @@
 				path: '/wp-authors-and-groups/v1/user-groups',
 			})
 				.then((fetchedGroups) => {
-					setUserGroups(fetchedGroups);
+					setUserGroups(Array.isArray(fetchedGroups) ? fetchedGroups : []);
 					setIsLoadingGroups(false);
 				})
 				.catch(() => {
+					// Silently handle error - groups list will remain empty
 					setIsLoadingGroups(false);
 				});
 		}, []);
 
-		// Handle checkbox change for groups
+		// Default to post author if both selected users and groups are empty (only on mount)
+		// Note: Intentionally using empty dependency array to run only once on mount.
+		// registry and editPost are stable references from hooks and don't need to be in deps.
+		useEffect(() => {
+			// Get current values from store
+			const currentMeta = registry.select('core/editor').getEditedPostAttribute('meta');
+			const currentAuthor = registry.select('core/editor').getEditedPostAttribute('author');
+			const currentPostId = registry.select('core/editor').getCurrentPostId();
+
+			// Don't run if we don't have author or postId
+			if (!currentAuthor || !currentPostId) {
+				return;
+			}
+
+			// Get current meta values
+			const metaUsers = Array.isArray(currentMeta?.['wp_authors_and_groups_selected_users'])
+				? currentMeta['wp_authors_and_groups_selected_users']
+				: [];
+			const metaGroups = Array.isArray(currentMeta?.['wp_authors_and_groups_selected_groups'])
+				? currentMeta['wp_authors_and_groups_selected_groups']
+				: [];
+
+			// If both are empty and we have an author, set the author as default
+			if (metaUsers.length === 0 && metaGroups.length === 0) {
+				const authorId = parseInt(currentAuthor, 10);
+
+				// Only set if we have a valid author ID
+				if (authorId && !isNaN(authorId)) {
+					editPost({
+						meta: {
+							...currentMeta,
+							wp_authors_and_groups_selected_users: [authorId],
+						},
+					});
+				}
+			}
+			// eslint-disable-next-line react-hooks/exhaustive-deps
+		}, []); // Empty dependency array - only runs on mount
+
+		/**
+		 * Handles toggling a user group checkbox.
+		 *
+		 * @param {number} groupId   The ID of the group to toggle.
+		 * @param {boolean} isChecked Whether the group should be checked.
+		 */
 		const handleGroupToggle = useCallback((groupId, isChecked) => {
 			// Get the latest meta from the store
 			const currentMeta = registry.select('core/editor').getEditedPostAttribute('meta');
@@ -87,6 +153,12 @@
 			});
 		}, [registry, editPost]);
 
+		/**
+		 * Handles toggling a user checkbox.
+		 *
+		 * @param {number} userId    The ID of the user to toggle.
+		 * @param {boolean} isChecked Whether the user should be checked.
+		 */
 		const handleUserToggle = useCallback((userId, isChecked) => {
 			// Get the latest meta from the store
 			const currentMeta = registry.select('core/editor').getEditedPostAttribute('meta');

@@ -11,8 +11,6 @@
     "author": "Kelvin Xu",
     "license": "GPL-2.0-only",
     "devDependencies": {
-        "@wordpress/scripts": "^31.2.0",
-        "install": "^0.13.0",
-        "npm": "^10.9.4"
+        "@wordpress/scripts": "^31.2.0"
     }
 }

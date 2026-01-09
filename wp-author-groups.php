@@ -15,45 +15,68 @@
 
 namespace UBC\CTLT\Block\AuthorGroups;
 
+// If this file is called directly, abort.
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 add_action( 'enqueue_block_editor_assets', __NAMESPACE__ . '\\enqueue_scripts', 99 );
 add_action( 'init', __NAMESPACE__ . '\\register_meta_fields' );
 add_action( 'rest_api_init', __NAMESPACE__ . '\\register_rest_routes' );
 
-	/**
-	 * Enqueues the necessary scripts and styles for the editor.
-	 *
-	 * @return void
-	 */
+/**
+ * Enqueues the necessary scripts and styles for the editor.
+ *
+ * @return void
+ */
 function enqueue_scripts() {
-	wp_enqueue_script(
-		'wp-authors-and-groups-script',
-		plugin_dir_url( __FILE__ ) . '/build/editor.js',
-		array(
-			'wp-plugins',
-			'wp-edit-post',
-			'wp-components',
-			'wp-data',
-			'wp-element',
-			'wp-i18n',
-			'wp-api-fetch',
-		),
-		filemtime( plugin_dir_path( __FILE__ ) . '/build/editor.js' ),
-		true
-	);
+	$plugin_dir_path = plugin_dir_path( __FILE__ );
+	$plugin_dir_url  = plugin_dir_url( __FILE__ );
 
-	wp_enqueue_style(
-		'wp-authors-and-groups-style',
-		plugin_dir_url( __FILE__ ) . '/build/editor.css',
-		array(),
-		filemtime( plugin_dir_path( __FILE__ ) . '/build/editor.css' )
-	);
+	// Enqueue editor script.
+	$editor_js_path = $plugin_dir_path . 'build/editor.js';
+	$editor_js_url  = $plugin_dir_url . 'build/editor.js';
+	if ( file_exists( $editor_js_path ) ) {
+		wp_enqueue_script(
+			'wp-authors-and-groups-script',
+			$editor_js_url,
+			array(
+				'wp-plugins',
+				'wp-edit-post',
+				'wp-components',
+				'wp-data',
+				'wp-element',
+				'wp-i18n',
+				'wp-api-fetch',
+			),
+			filemtime( $editor_js_path ),
+			true
+		);
+	}
 
-	wp_enqueue_style(
-		'wp-authors-and-groups-editor-style',
-		plugin_dir_url( __FILE__ ) . '/css/editor.css',
-		array(),
-		filemtime( plugin_dir_path( __FILE__ ) . '/css/editor.css' )
-	);
+	// Enqueue editor styles.
+	$editor_css_path = $plugin_dir_path . 'build/editor.css';
+	$editor_css_url  = $plugin_dir_url . 'build/editor.css';
+	if ( file_exists( $editor_css_path ) ) {
+		wp_enqueue_style(
+			'wp-authors-and-groups-style',
+			$editor_css_url,
+			array(),
+			filemtime( $editor_css_path )
+		);
+	}
+
+	// Enqueue additional editor styles.
+	$additional_css_path = $plugin_dir_path . 'css/editor.css';
+	$additional_css_url  = $plugin_dir_url . 'css/editor.css';
+	if ( file_exists( $additional_css_path ) ) {
+		wp_enqueue_style(
+			'wp-authors-and-groups-editor-style',
+			$additional_css_url,
+			array(),
+			filemtime( $additional_css_path )
+		);
+	}
 }
 
 /**
@@ -169,13 +192,18 @@ function get_user_groups() {
 		return $terms;
 	}
 
+	// Ensure we have an array (get_terms can return WP_Error or array).
+	if ( ! is_array( $terms ) ) {
+		return rest_ensure_response( array() );
+	}
+
 	// Format terms for REST API response.
 	$groups = array_map(
 		function ( $term ) {
 			return array(
-				'id'   => $term->term_id,
-				'name' => $term->name,
-				'slug' => $term->slug,
+				'id'   => isset( $term->term_id ) ? (int) $term->term_id : 0,
+				'name' => isset( $term->name ) ? sanitize_text_field( $term->name ) : '',
+				'slug' => isset( $term->slug ) ? sanitize_text_field( $term->slug ) : '',
 			);
 		},
 		$terms
