@@ -24,6 +24,7 @@ add_action( 'enqueue_block_editor_assets', __NAMESPACE__ . '\\enqueue_scripts', 
 add_action( 'init', __NAMESPACE__ . '\\register_meta_fields' );
 add_action( 'rest_api_init', __NAMESPACE__ . '\\register_rest_routes' );
 add_action( 'admin_init', __NAMESPACE__ . '\\ensure_current_user_on_site' );
+add_filter( 'the_author', __NAMESPACE__ . '\\filter_author_display', 10, 1 );
 
 /**
  * Enqueues the necessary scripts and styles for the editor.
@@ -327,4 +328,113 @@ function get_current_user_groups() {
 	);
 
 	return rest_ensure_response( $groups );
+}
+
+/**
+ * Gets formatted author and group names for a post.
+ *
+ * @param int $post_id Post ID.
+ * @return string Comma-separated list of author and group names.
+ */
+function get_formatted_authors_and_groups( $post_id ) {
+	$post_id = absint( $post_id );
+
+	if ( ! $post_id ) {
+		return '';
+	}
+
+	// Get meta values.
+	$selected_users  = get_post_meta( $post_id, 'wp_authors_and_groups_selected_users', true );
+	$selected_groups = get_post_meta( $post_id, 'wp_authors_and_groups_selected_groups', true );
+	$selected_order  = get_post_meta( $post_id, 'wp_authors_and_groups_selected_order', true );
+
+	// Ensure arrays.
+	$selected_users  = is_array( $selected_users ) ? $selected_users : array();
+	$selected_groups = is_array( $selected_groups ) ? $selected_groups : array();
+	$selected_order  = is_array( $selected_order ) ? $selected_order : array();
+
+	// If no selections, return empty string.
+	if ( empty( $selected_users ) && empty( $selected_groups ) ) {
+		return '';
+	}
+
+	$names = array();
+
+	// If we have stored order, use it to maintain the order.
+	if ( ! empty( $selected_order ) ) {
+		foreach ( $selected_order as $prefixed_value ) {
+			if ( strpos( $prefixed_value, 'user-' ) === 0 ) {
+				$user_id = absint( str_replace( 'user-', '', $prefixed_value ) );
+				if ( $user_id && in_array( $user_id, $selected_users, true ) ) {
+					$user = get_userdata( $user_id );
+					if ( $user ) {
+						$names[] = $user->display_name;
+					}
+				}
+			} elseif ( strpos( $prefixed_value, 'group-' ) === 0 ) {
+				$group_id = absint( str_replace( 'group-', '', $prefixed_value ) );
+				if ( $group_id && in_array( $group_id, $selected_groups, true ) ) {
+					$term = get_term( $group_id, 'user-group' );
+					if ( $term && ! is_wp_error( $term ) ) {
+						$names[] = $term->name;
+					}
+				}
+			}
+		}
+	} else {
+		// Fallback: groups first, then users.
+		foreach ( $selected_groups as $group_id ) {
+			$group_id = absint( $group_id );
+			$term     = get_term( $group_id, 'user-group' );
+			if ( $term && ! is_wp_error( $term ) ) {
+				$names[] = $term->name;
+			}
+		}
+
+		foreach ( $selected_users as $user_id ) {
+			$user_id = absint( $user_id );
+			$user    = get_userdata( $user_id );
+			if ( $user ) {
+				$names[] = $user->display_name;
+			}
+		}
+	}
+
+	// Return comma-separated list.
+	return implode( ', ', $names );
+}
+
+/**
+ * Filters the author display name.
+ *
+ * @param string $display_name The author's display name.
+ * @return string Modified author display name.
+ */
+function filter_author_display( $display_name ) {
+	global $post;
+
+	if ( ! $post || ! isset( $post->ID ) ) {
+		return $display_name;
+	}
+
+	$formatted = get_formatted_authors_and_groups( $post->ID );
+
+	// If we have custom authors/groups, return them.
+	if ( ! empty( $formatted ) ) {
+		return $formatted;
+	}
+
+	// Fallback: return the original post author.
+	// $display_name already contains the post author's display name,
+	// but we'll get it explicitly from the post to be sure.
+	$post_author_id = isset( $post->post_author ) ? absint( $post->post_author ) : 0;
+	if ( $post_author_id ) {
+		$author = get_userdata( $post_author_id );
+		if ( $author ) {
+			return $author->display_name;
+		}
+	}
+
+	// Final fallback to the original display name.
+	return $display_name;
 }
