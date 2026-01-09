@@ -2,24 +2,24 @@
 /******/ 	"use strict";
 /******/ 	var __webpack_modules__ = ({
 
-/***/ "./js/editor-post-panel.js"
-/*!*********************************!*\
-  !*** ./js/editor-post-panel.js ***!
-  \*********************************/
+/***/ "./js/components.js"
+/*!**************************!*\
+  !*** ./js/components.js ***!
+  \**************************/
 (__unused_webpack_module, __webpack_exports__, __webpack_require__) {
 
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var react_select__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react-select */ "./node_modules/react-select/dist/react-select.esm.js");
-/* harmony import */ var _dnd_kit_core__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @dnd-kit/core */ "./node_modules/@dnd-kit/core/dist/core.esm.js");
-/* harmony import */ var _dnd_kit_sortable__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @dnd-kit/sortable */ "./node_modules/@dnd-kit/sortable/dist/sortable.esm.js");
-/* harmony import */ var _dnd_kit_utilities__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! @dnd-kit/utilities */ "./node_modules/@dnd-kit/utilities/dist/utilities.esm.js");
-/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! react/jsx-runtime */ "react/jsx-runtime");
-/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4___default = /*#__PURE__*/__webpack_require__.n(react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   DraggableMultiValue: () => (/* binding */ DraggableMultiValue)
+/* harmony export */ });
+/* harmony import */ var _dnd_kit_sortable__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @dnd-kit/sortable */ "./node_modules/@dnd-kit/sortable/dist/sortable.esm.js");
+/* harmony import */ var _dnd_kit_utilities__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @dnd-kit/utilities */ "./node_modules/@dnd-kit/utilities/dist/utilities.esm.js");
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! react/jsx-runtime */ "react/jsx-runtime");
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__);
 /**
- * WordPress Authors and Groups Editor Panel
+ * WordPress Authors and Groups Components
  *
- * Provides a document settings panel in the block editor for selecting
- * authors and user groups for posts and pages.
+ * Reusable components for the authors and groups editor panel.
  *
  * @package wp-authors-and-groups
  */
@@ -27,444 +27,465 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
+const {
+  __
+} = wp.i18n;
 
-
-(function (wp) {
+/**
+ * Draggable MultiValue Component for react-select
+ *
+ * Makes the selected items in react-select draggable.
+ *
+ * @param {Object} props Component props from react-select.
+ * @return {JSX.Element} The draggable multi-value component.
+ */
+const DraggableMultiValue = props => {
   const {
-    registerPlugin
-  } = wp.plugins;
-  const {
-    PluginDocumentSettingPanel
-  } = wp.editPost;
-  const {
-    useSelect,
-    useDispatch,
-    useRegistry
-  } = wp.data;
-  const {
-    __
-  } = wp.i18n;
-  const {
-    useState,
-    useEffect,
-    useCallback,
-    useMemo
-  } = wp.element;
-  const apiFetch = wp.apiFetch;
-
-  /**
-   * Draggable MultiValue Component for react-select
-   *
-   * Makes the selected items in react-select draggable.
-   *
-   * @param {Object} props Component props from react-select.
-   * @return {JSX.Element} The draggable multi-value component.
-   */
-  const DraggableMultiValue = props => {
-    const {
-      attributes,
-      listeners,
-      setNodeRef,
-      transform,
-      transition,
-      isDragging
-    } = (0,_dnd_kit_sortable__WEBPACK_IMPORTED_MODULE_2__.useSortable)({
-      id: props.data.value
-    });
-    const containerStyle = {
-      transform: _dnd_kit_utilities__WEBPACK_IMPORTED_MODULE_3__.CSS.Transform.toString(transform),
-      transition,
-      opacity: isDragging ? 0.5 : 1,
-      // Ensure background is applied with light grey
-      backgroundColor: '#f0f0f1',
-      color: '#2c3338',
-      padding: '6px 10px',
-      margin: '2px 4px 2px 0',
-      borderRadius: '4px',
-      border: '1px solid #dcdcde',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '6px',
-      boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)'
-    };
-
-    // Drag handle style - only this area is draggable
-    const dragHandleStyle = {
-      cursor: isDragging ? 'grabbing' : 'grab',
-      display: 'flex',
-      alignItems: 'center',
-      padding: '0 4px',
-      marginRight: '4px',
-      color: '#646970'
-    };
-
-    // Preserve react-select's default MultiValue structure
-    // Apply drag listeners only to a drag handle, not the entire item
-    // props.children already contains the label, so we just render it directly
-    return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsxs)("div", {
-      ref: setNodeRef,
-      style: containerStyle,
-      ...attributes,
-      children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)("span", {
-        ...listeners,
-        style: dragHandleStyle,
-        "aria-label": __('Drag to reorder', 'wp-authors-and-groups'),
-        children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsxs)("svg", {
-          width: "12",
-          height: "12",
-          viewBox: "0 0 12 12",
-          fill: "currentColor",
-          children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)("circle", {
-            cx: "2",
-            cy: "2",
-            r: "1"
-          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)("circle", {
-            cx: "6",
-            cy: "2",
-            r: "1"
-          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)("circle", {
-            cx: "10",
-            cy: "2",
-            r: "1"
-          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)("circle", {
-            cx: "2",
-            cy: "6",
-            r: "1"
-          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)("circle", {
-            cx: "6",
-            cy: "6",
-            r: "1"
-          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)("circle", {
-            cx: "10",
-            cy: "6",
-            r: "1"
-          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)("circle", {
-            cx: "2",
-            cy: "10",
-            r: "1"
-          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)("circle", {
-            cx: "6",
-            cy: "10",
-            r: "1"
-          }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)("circle", {
-            cx: "10",
-            cy: "10",
-            r: "1"
-          })]
-        })
-      }), props.children, props.removeProps && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)("button", {
-        className: "wp-authors-and-groups-select__multi-value__remove",
-        ...props.removeProps,
-        onMouseDown: e => {
-          // Prevent drag from starting when clicking remove button
-          e.stopPropagation();
-        },
-        onClick: e => {
-          // Prevent any drag handlers from interfering
-          e.stopPropagation();
-          // Call the original remove handler
-          if (props.removeProps.onClick) {
-            props.removeProps.onClick(e);
-          }
-        },
-        "aria-label": __('Remove', 'wp-authors-and-groups'),
-        children: "\xD7"
-      })]
-    });
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = (0,_dnd_kit_sortable__WEBPACK_IMPORTED_MODULE_0__.useSortable)({
+    id: props.data.value
+  });
+  const containerStyle = {
+    transform: _dnd_kit_utilities__WEBPACK_IMPORTED_MODULE_1__.CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    // Ensure background is applied with light grey
+    backgroundColor: '#f0f0f1',
+    color: '#2c3338',
+    padding: '6px 10px',
+    margin: '2px 4px 2px 0',
+    borderRadius: '4px',
+    border: '1px solid #dcdcde',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.1)'
   };
 
-  /**
-   * Author Groups Panel Component
-   *
-   * Renders a document settings panel with a grouped react-select dropdown for selecting
-   * user groups and individual users as authors, with drag-and-drop reordering.
-   *
-   * @return {JSX.Element|null} The panel component or null if not applicable.
-   */
-  const AuthorGroupsPanel = () => {
-    const registry = useRegistry();
-    const {
-      meta,
-      postType
-    } = useSelect(select => {
-      const editor = select('core/editor');
-      return {
-        meta: editor.getEditedPostAttribute('meta'),
-        postType: editor.getCurrentPostType()
-      };
-    }, []);
-    const {
-      editPost
-    } = useDispatch('core/editor');
+  // Drag handle style - only this area is draggable
+  const dragHandleStyle = {
+    cursor: isDragging ? 'grabbing' : 'grab',
+    display: 'flex',
+    alignItems: 'center',
+    padding: '0 4px',
+    marginRight: '4px',
+    color: '#646970'
+  };
 
-    // Get current selected users - expect array of user IDs
-    const selectedUsers = Array.isArray(meta?.['wp_authors_and_groups_selected_users']) ? meta['wp_authors_and_groups_selected_users'] : [];
+  // Preserve react-select's default MultiValue structure
+  // Apply drag listeners only to a drag handle, not the entire item
+  // props.children already contains the label, so we just render it directly
+  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+    ref: setNodeRef,
+    style: containerStyle,
+    ...attributes,
+    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("span", {
+      ...listeners,
+      style: dragHandleStyle,
+      "aria-label": __('Drag to reorder', 'wp-authors-and-groups'),
+      children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("svg", {
+        width: "12",
+        height: "12",
+        viewBox: "0 0 12 12",
+        fill: "currentColor",
+        children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("circle", {
+          cx: "2",
+          cy: "2",
+          r: "1"
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("circle", {
+          cx: "6",
+          cy: "2",
+          r: "1"
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("circle", {
+          cx: "10",
+          cy: "2",
+          r: "1"
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("circle", {
+          cx: "2",
+          cy: "6",
+          r: "1"
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("circle", {
+          cx: "6",
+          cy: "6",
+          r: "1"
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("circle", {
+          cx: "10",
+          cy: "6",
+          r: "1"
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("circle", {
+          cx: "2",
+          cy: "10",
+          r: "1"
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("circle", {
+          cx: "6",
+          cy: "10",
+          r: "1"
+        }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("circle", {
+          cx: "10",
+          cy: "10",
+          r: "1"
+        })]
+      })
+    }), props.children, props.removeProps && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("button", {
+      className: "wp-authors-and-groups-select__multi-value__remove",
+      ...props.removeProps,
+      onMouseDown: e => {
+        // Prevent drag from starting when clicking remove button
+        e.stopPropagation();
+      },
+      onClick: e => {
+        // Prevent any drag handlers from interfering
+        e.stopPropagation();
+        // Call the original remove handler
+        if (props.removeProps.onClick) {
+          props.removeProps.onClick(e);
+        }
+      },
+      "aria-label": __('Remove', 'wp-authors-and-groups'),
+      children: "\xD7"
+    })]
+  });
+};
 
-    // Get current selected groups - expect array of group term IDs
-    const selectedGroups = Array.isArray(meta?.['wp_authors_and_groups_selected_groups']) ? meta['wp_authors_and_groups_selected_groups'] : [];
+/***/ },
 
-    // State for users list
-    const [users, setUsers] = useState([]);
-    const [isLoadingUsers, setIsLoadingUsers] = useState(true);
+/***/ "./js/hooks.js"
+/*!*********************!*\
+  !*** ./js/hooks.js ***!
+  \*********************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
 
-    // State for user groups list
-    const [userGroups, setUserGroups] = useState([]);
-    const [isLoadingGroups, setIsLoadingGroups] = useState(true);
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   useCombinedChange: () => (/* binding */ useCombinedChange),
+/* harmony export */   useDefaultAuthor: () => (/* binding */ useDefaultAuthor),
+/* harmony export */   useDragAndDrop: () => (/* binding */ useDragAndDrop),
+/* harmony export */   useSelectOptions: () => (/* binding */ useSelectOptions),
+/* harmony export */   useSelectedOptions: () => (/* binding */ useSelectedOptions),
+/* harmony export */   useUserGroups: () => (/* binding */ useUserGroups),
+/* harmony export */   useUsers: () => (/* binding */ useUsers)
+/* harmony export */ });
+/* harmony import */ var _dnd_kit_core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! @dnd-kit/core */ "./node_modules/@dnd-kit/core/dist/core.esm.js");
+/* harmony import */ var _dnd_kit_sortable__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @dnd-kit/sortable */ "./node_modules/@dnd-kit/sortable/dist/sortable.esm.js");
+/**
+ * WordPress Authors and Groups Custom Hooks
+ *
+ * Custom React hooks for managing users, groups, and selections.
+ *
+ * @package wp-authors-and-groups
+ */
 
-    // Transform groups data for react-select with prefix
-    const groupOptions = useMemo(() => {
-      return userGroups.map(group => ({
-        value: `group-${group.id}`,
-        label: group.name
-      }));
-    }, [userGroups]);
 
-    // Transform users data for react-select with prefix
-    const userOptions = useMemo(() => {
-      return users.map(user => ({
-        value: `user-${user.id}`,
-        label: user.name
-      }));
-    }, [users]);
 
-    // Create grouped options for react-select
-    const groupedOptions = useMemo(() => {
-      const groups = [];
-      if (userGroups.length > 0) {
-        groups.push({
-          label: __('User Groups', 'wp-authors-and-groups'),
-          options: groupOptions
-        });
-      }
-      if (users.length > 0) {
-        groups.push({
-          label: __('Users', 'wp-authors-and-groups'),
-          options: userOptions
-        });
-      }
-      return groups;
-    }, [groupOptions, userOptions, userGroups.length, users.length]);
+const {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo
+} = wp.element;
+const {
+  useDispatch,
+  useRegistry
+} = wp.data;
+const {
+  __
+} = wp.i18n;
+const apiFetch = wp.apiFetch;
 
-    // Get stored order from meta (if available)
-    const storedOrder = Array.isArray(meta?.['wp_authors_and_groups_selected_order']) ? meta['wp_authors_and_groups_selected_order'] : [];
+/**
+ * Custom hook to fetch and manage users list.
+ *
+ * @return {Object} Object containing users array and loading state.
+ */
+const useUsers = () => {
+  const [users, setUsers] = useState([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(true);
+  useEffect(() => {
+    apiFetch({
+      path: '/wp/v2/users?per_page=100&orderby=name&order=asc'
+    }).then(fetchedUsers => {
+      setUsers(Array.isArray(fetchedUsers) ? fetchedUsers : []);
+      setIsLoadingUsers(false);
+    }).catch(() => {
+      // Silently handle error - users list will remain empty
+      setIsLoadingUsers(false);
+    });
+  }, []);
+  return {
+    users,
+    isLoadingUsers
+  };
+};
 
-    // Transform selected values for react-select (combine both users and groups with prefixes)
-    // Preserve order from storedOrder if available, otherwise groups first, then users
-    const selectedOptions = useMemo(() => {
-      const selected = [];
+/**
+ * Custom hook to fetch and manage user groups list.
+ *
+ * @return {Object} Object containing userGroups array and loading state.
+ */
+const useUserGroups = () => {
+  const [userGroups, setUserGroups] = useState([]);
+  const [isLoadingGroups, setIsLoadingGroups] = useState(true);
+  useEffect(() => {
+    apiFetch({
+      path: '/wp-authors-and-groups/v1/user-groups'
+    }).then(fetchedGroups => {
+      setUserGroups(Array.isArray(fetchedGroups) ? fetchedGroups : []);
+      setIsLoadingGroups(false);
+    }).catch(() => {
+      // Silently handle error - groups list will remain empty
+      setIsLoadingGroups(false);
+    });
+  }, []);
+  return {
+    userGroups,
+    isLoadingGroups
+  };
+};
 
-      // If we have stored order, use it
-      if (storedOrder.length > 0) {
-        storedOrder.forEach(prefixedValue => {
-          if (prefixedValue.startsWith('group-')) {
-            const groupId = parseInt(prefixedValue.replace('group-', ''), 10);
-            const option = groupOptions.find(opt => opt.value === `group-${groupId}`);
-            if (option) {
-              selected.push(option);
-            }
-          } else if (prefixedValue.startsWith('user-')) {
-            const userId = parseInt(prefixedValue.replace('user-', ''), 10);
-            const option = userOptions.find(opt => opt.value === `user-${userId}`);
-            if (option) {
-              selected.push(option);
-            }
-          }
-        });
-      } else {
-        // Fallback: groups first, then users
-        selectedGroups.forEach(groupId => {
+/**
+ * Custom hook to transform users and groups into react-select options.
+ *
+ * @param {Array} users      Array of user objects.
+ * @param {Array} userGroups Array of user group objects.
+ * @return {Object} Object containing groupOptions, userOptions, and groupedOptions.
+ */
+const useSelectOptions = (users, userGroups) => {
+  // Transform groups data for react-select with prefix
+  const groupOptions = useMemo(() => {
+    return userGroups.map(group => ({
+      value: `group-${group.id}`,
+      label: group.name
+    }));
+  }, [userGroups]);
+
+  // Transform users data for react-select with prefix
+  const userOptions = useMemo(() => {
+    return users.map(user => ({
+      value: `user-${user.id}`,
+      label: user.name
+    }));
+  }, [users]);
+
+  // Create grouped options for react-select
+  const groupedOptions = useMemo(() => {
+    const groups = [];
+    if (userGroups.length > 0) {
+      groups.push({
+        label: __('User Groups', 'wp-authors-and-groups'),
+        options: groupOptions
+      });
+    }
+    if (users.length > 0) {
+      groups.push({
+        label: __('Users', 'wp-authors-and-groups'),
+        options: userOptions
+      });
+    }
+    return groups;
+  }, [groupOptions, userOptions, userGroups.length, users.length]);
+  return {
+    groupOptions,
+    userOptions,
+    groupedOptions
+  };
+};
+
+/**
+ * Custom hook to get selected options from meta and transform them for react-select.
+ *
+ * @param {Object} meta         Post meta object.
+ * @param {Array}  groupOptions Array of group option objects.
+ * @param {Array}  userOptions  Array of user option objects.
+ * @return {Array} Array of selected option objects for react-select.
+ */
+const useSelectedOptions = (meta, groupOptions, userOptions) => {
+  // Get current selected users - expect array of user IDs
+  const selectedUsers = Array.isArray(meta?.['wp_authors_and_groups_selected_users']) ? meta['wp_authors_and_groups_selected_users'] : [];
+
+  // Get current selected groups - expect array of group term IDs
+  const selectedGroups = Array.isArray(meta?.['wp_authors_and_groups_selected_groups']) ? meta['wp_authors_and_groups_selected_groups'] : [];
+
+  // Get stored order from meta (if available)
+  const storedOrder = Array.isArray(meta?.['wp_authors_and_groups_selected_order']) ? meta['wp_authors_and_groups_selected_order'] : [];
+
+  // Transform selected values for react-select (combine both users and groups with prefixes)
+  // Preserve order from storedOrder if available, otherwise groups first, then users
+  const selectedOptions = useMemo(() => {
+    const selected = [];
+
+    // If we have stored order, use it
+    if (storedOrder.length > 0) {
+      storedOrder.forEach(prefixedValue => {
+        if (prefixedValue.startsWith('group-')) {
+          const groupId = parseInt(prefixedValue.replace('group-', ''), 10);
           const option = groupOptions.find(opt => opt.value === `group-${groupId}`);
           if (option) {
             selected.push(option);
           }
-        });
-        selectedUsers.forEach(userId => {
+        } else if (prefixedValue.startsWith('user-')) {
+          const userId = parseInt(prefixedValue.replace('user-', ''), 10);
           const option = userOptions.find(opt => opt.value === `user-${userId}`);
           if (option) {
             selected.push(option);
           }
-        });
+        }
+      });
+    } else {
+      // Fallback: groups first, then users
+      selectedGroups.forEach(groupId => {
+        const option = groupOptions.find(opt => opt.value === `group-${groupId}`);
+        if (option) {
+          selected.push(option);
+        }
+      });
+      selectedUsers.forEach(userId => {
+        const option = userOptions.find(opt => opt.value === `user-${userId}`);
+        if (option) {
+          selected.push(option);
+        }
+      });
+    }
+    return selected;
+  }, [groupOptions, userOptions, selectedGroups, selectedUsers, storedOrder]);
+  return selectedOptions;
+};
+
+/**
+ * Custom hook to handle combined selection change.
+ *
+ * @return {Function} Handler function for selection changes.
+ */
+const useCombinedChange = () => {
+  const registry = useRegistry();
+  const {
+    editPost
+  } = useDispatch('core/editor');
+  return useCallback(selectedOptions => {
+    // Get the latest meta from the store
+    const currentMeta = registry.select('core/editor').getEditedPostAttribute('meta');
+
+    // Separate users and groups based on prefix, preserving order
+    const newUsers = [];
+    const newGroups = [];
+    const newOrder = [];
+    if (selectedOptions) {
+      selectedOptions.forEach(option => {
+        const value = option.value;
+        newOrder.push(value); // Store order with prefixes
+
+        if (value.startsWith('user-')) {
+          const userId = parseInt(value.replace('user-', ''), 10);
+          if (!isNaN(userId)) {
+            newUsers.push(userId);
+          }
+        } else if (value.startsWith('group-')) {
+          const groupId = parseInt(value.replace('group-', ''), 10);
+          if (!isNaN(groupId)) {
+            newGroups.push(groupId);
+          }
+        }
+      });
+    }
+
+    // Save to post meta immediately, including order
+    editPost({
+      meta: {
+        ...currentMeta,
+        wp_authors_and_groups_selected_users: newUsers,
+        wp_authors_and_groups_selected_groups: newGroups,
+        wp_authors_and_groups_selected_order: newOrder
       }
-      return selected;
-    }, [groupOptions, userOptions, selectedGroups, selectedUsers, storedOrder]);
+    });
+  }, [registry, editPost]);
+};
 
-    /**
-     * Handles combined selection change from react-select.
-     * Parses prefixed values to separate users and groups and preserves order.
-     *
-     * @param {Array} selectedOptions Array of selected option objects from react-select.
-     */
-    const handleCombinedChange = useCallback(selectedOptions => {
-      // Get the latest meta from the store
-      const currentMeta = registry.select('core/editor').getEditedPostAttribute('meta');
+/**
+ * Custom hook to set default author when both users and groups are empty.
+ *
+ * @return {void}
+ */
+const useDefaultAuthor = () => {
+  const registry = useRegistry();
+  const {
+    editPost
+  } = useDispatch('core/editor');
 
-      // Separate users and groups based on prefix, preserving order
-      const newUsers = [];
-      const newGroups = [];
-      const newOrder = [];
-      if (selectedOptions) {
-        selectedOptions.forEach(option => {
-          const value = option.value;
-          newOrder.push(value); // Store order with prefixes
+  // Default to post author if both selected users and groups are empty (only on mount)
+  // Note: Intentionally using empty dependency array to run only once on mount.
+  // registry and editPost are stable references from hooks and don't need to be in deps.
+  useEffect(() => {
+    // Get current values from store
+    const currentMeta = registry.select('core/editor').getEditedPostAttribute('meta');
+    const currentAuthor = registry.select('core/editor').getEditedPostAttribute('author');
+    const currentPostId = registry.select('core/editor').getCurrentPostId();
 
-          if (value.startsWith('user-')) {
-            const userId = parseInt(value.replace('user-', ''), 10);
-            if (!isNaN(userId)) {
-              newUsers.push(userId);
-            }
-          } else if (value.startsWith('group-')) {
-            const groupId = parseInt(value.replace('group-', ''), 10);
-            if (!isNaN(groupId)) {
-              newGroups.push(groupId);
-            }
+    // Don't run if we don't have author or postId
+    if (!currentAuthor || !currentPostId) {
+      return;
+    }
+
+    // Get current meta values
+    const metaUsers = Array.isArray(currentMeta?.['wp_authors_and_groups_selected_users']) ? currentMeta['wp_authors_and_groups_selected_users'] : [];
+    const metaGroups = Array.isArray(currentMeta?.['wp_authors_and_groups_selected_groups']) ? currentMeta['wp_authors_and_groups_selected_groups'] : [];
+
+    // If both are empty and we have an author, set the author as default
+    if (metaUsers.length === 0 && metaGroups.length === 0) {
+      const authorId = parseInt(currentAuthor, 10);
+
+      // Only set if we have a valid author ID
+      if (authorId && !isNaN(authorId)) {
+        editPost({
+          meta: {
+            ...currentMeta,
+            wp_authors_and_groups_selected_users: [authorId]
           }
         });
       }
-
-      // Save to post meta immediately, including order
-      editPost({
-        meta: {
-          ...currentMeta,
-          wp_authors_and_groups_selected_users: newUsers,
-          wp_authors_and_groups_selected_groups: newGroups,
-          wp_authors_and_groups_selected_order: newOrder
-        }
-      });
-    }, [registry, editPost]);
-
-    // Drag and drop sensors
-    const sensors = (0,_dnd_kit_core__WEBPACK_IMPORTED_MODULE_1__.useSensors)((0,_dnd_kit_core__WEBPACK_IMPORTED_MODULE_1__.useSensor)(_dnd_kit_core__WEBPACK_IMPORTED_MODULE_1__.PointerSensor), (0,_dnd_kit_core__WEBPACK_IMPORTED_MODULE_1__.useSensor)(_dnd_kit_core__WEBPACK_IMPORTED_MODULE_1__.KeyboardSensor, {
-      coordinateGetter: _dnd_kit_sortable__WEBPACK_IMPORTED_MODULE_2__.sortableKeyboardCoordinates
-    }));
-
-    /**
-     * Handles drag end event to reorder items.
-     *
-     * @param {Object} event Drag end event.
-     */
-    const handleDragEnd = useCallback(event => {
-      const {
-        active,
-        over
-      } = event;
-      if (over && active.id !== over.id) {
-        const oldIndex = selectedOptions.findIndex(item => item.value === active.id);
-        const newIndex = selectedOptions.findIndex(item => item.value === over.id);
-        const newSelectedOptions = (0,_dnd_kit_sortable__WEBPACK_IMPORTED_MODULE_2__.arrayMove)(selectedOptions, oldIndex, newIndex);
-        handleCombinedChange(newSelectedOptions);
-      }
-    }, [selectedOptions, handleCombinedChange]);
-
-    // Fetch users on component mount
-    useEffect(() => {
-      apiFetch({
-        path: '/wp/v2/users?per_page=100&orderby=name&order=asc'
-      }).then(fetchedUsers => {
-        setUsers(Array.isArray(fetchedUsers) ? fetchedUsers : []);
-        setIsLoadingUsers(false);
-      }).catch(() => {
-        // Silently handle error - users list will remain empty
-        setIsLoadingUsers(false);
-      });
-    }, []);
-
-    // Fetch user groups on component mount
-    useEffect(() => {
-      apiFetch({
-        path: '/wp-authors-and-groups/v1/user-groups'
-      }).then(fetchedGroups => {
-        setUserGroups(Array.isArray(fetchedGroups) ? fetchedGroups : []);
-        setIsLoadingGroups(false);
-      }).catch(() => {
-        // Silently handle error - groups list will remain empty
-        setIsLoadingGroups(false);
-      });
-    }, []);
-
-    // Default to post author if both selected users and groups are empty (only on mount)
-    // Note: Intentionally using empty dependency array to run only once on mount.
-    // registry and editPost are stable references from hooks and don't need to be in deps.
-    useEffect(() => {
-      // Get current values from store
-      const currentMeta = registry.select('core/editor').getEditedPostAttribute('meta');
-      const currentAuthor = registry.select('core/editor').getEditedPostAttribute('author');
-      const currentPostId = registry.select('core/editor').getCurrentPostId();
-
-      // Don't run if we don't have author or postId
-      if (!currentAuthor || !currentPostId) {
-        return;
-      }
-
-      // Get current meta values
-      const metaUsers = Array.isArray(currentMeta?.['wp_authors_and_groups_selected_users']) ? currentMeta['wp_authors_and_groups_selected_users'] : [];
-      const metaGroups = Array.isArray(currentMeta?.['wp_authors_and_groups_selected_groups']) ? currentMeta['wp_authors_and_groups_selected_groups'] : [];
-
-      // If both are empty and we have an author, set the author as default
-      if (metaUsers.length === 0 && metaGroups.length === 0) {
-        const authorId = parseInt(currentAuthor, 10);
-
-        // Only set if we have a valid author ID
-        if (authorId && !isNaN(authorId)) {
-          editPost({
-            meta: {
-              ...currentMeta,
-              wp_authors_and_groups_selected_users: [authorId]
-            }
-          });
-        }
-      }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []); // Empty dependency array - only runs on mount
-
-    // Only show for posts and pages
-    if (postType !== 'post' && postType !== 'page') {
-      return null;
     }
-    const isLoading = isLoadingUsers || isLoadingGroups;
-    return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)(PluginDocumentSettingPanel, {
-      name: "wp-authors-and-groups-panel",
-      title: __('Authors and Groups', 'wp-authors-and-groups'),
-      className: "wp-authors-and-groups-panel",
-      initialOpen: true,
-      children: isLoading ? /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)("p", {
-        children: __('Loading...', 'wp-authors-and-groups')
-      }) : /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)(react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.Fragment, {
-        children: groupedOptions.length > 0 ? /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)("div", {
-          className: "wp-authors-and-groups-section",
-          children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)(_dnd_kit_core__WEBPACK_IMPORTED_MODULE_1__.DndContext, {
-            sensors: sensors,
-            collisionDetection: _dnd_kit_core__WEBPACK_IMPORTED_MODULE_1__.closestCenter,
-            onDragEnd: handleDragEnd,
-            children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)(_dnd_kit_sortable__WEBPACK_IMPORTED_MODULE_2__.SortableContext, {
-              items: selectedOptions.map(opt => opt.value),
-              strategy: _dnd_kit_sortable__WEBPACK_IMPORTED_MODULE_2__.horizontalListSortingStrategy,
-              children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)(react_select__WEBPACK_IMPORTED_MODULE_0__["default"], {
-                isMulti: true,
-                options: groupedOptions,
-                value: selectedOptions,
-                onChange: handleCombinedChange,
-                placeholder: __('Select users and groups...', 'wp-authors-and-groups'),
-                className: "wp-authors-and-groups-select",
-                classNamePrefix: "wp-authors-and-groups-select",
-                isSearchable: false,
-                isClearable: false,
-                components: {
-                  MultiValue: DraggableMultiValue
-                }
-              })
-            })
-          })
-        }) : /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_4__.jsx)("p", {
-          children: __('No user groups or users found.', 'wp-authors-and-groups')
-        })
-      })
-    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array - only runs on mount
+};
+
+/**
+ * Custom hook for drag and drop functionality.
+ *
+ * @param {Array}    selectedOptions     Currently selected options.
+ * @param {Function} handleCombinedChange Handler for selection changes.
+ * @return {Object} Object containing sensors and handleDragEnd function.
+ */
+const useDragAndDrop = (selectedOptions, handleCombinedChange) => {
+  // Drag and drop sensors
+  const sensors = (0,_dnd_kit_core__WEBPACK_IMPORTED_MODULE_0__.useSensors)((0,_dnd_kit_core__WEBPACK_IMPORTED_MODULE_0__.useSensor)(_dnd_kit_core__WEBPACK_IMPORTED_MODULE_0__.PointerSensor), (0,_dnd_kit_core__WEBPACK_IMPORTED_MODULE_0__.useSensor)(_dnd_kit_core__WEBPACK_IMPORTED_MODULE_0__.KeyboardSensor, {
+    coordinateGetter: _dnd_kit_sortable__WEBPACK_IMPORTED_MODULE_1__.sortableKeyboardCoordinates
+  }));
+
+  /**
+   * Handles drag end event to reorder items.
+   *
+   * @param {Object} event Drag end event.
+   */
+  const handleDragEnd = useCallback(event => {
+    const {
+      active,
+      over
+    } = event;
+    if (over && active.id !== over.id) {
+      const oldIndex = selectedOptions.findIndex(item => item.value === active.id);
+      const newIndex = selectedOptions.findIndex(item => item.value === over.id);
+      const newSelectedOptions = (0,_dnd_kit_sortable__WEBPACK_IMPORTED_MODULE_1__.arrayMove)(selectedOptions, oldIndex, newIndex);
+      handleCombinedChange(newSelectedOptions);
+    }
+  }, [selectedOptions, handleCombinedChange]);
+  return {
+    sensors,
+    handleDragEnd
   };
-  registerPlugin('wp-authors-and-groups', {
-    render: AuthorGroupsPanel,
-    icon: 'groups'
-  });
-})(window.wp);
+};
 
 /***/ },
 
@@ -16876,8 +16897,133 @@ var __webpack_exports__ = {};
   !*** ./js/editor.js ***!
   \**********************/
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _editor_post_panel_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./editor-post-panel.js */ "./js/editor-post-panel.js");
+/* harmony import */ var react_select__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react-select */ "./node_modules/react-select/dist/react-select.esm.js");
+/* harmony import */ var _dnd_kit_core__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @dnd-kit/core */ "./node_modules/@dnd-kit/core/dist/core.esm.js");
+/* harmony import */ var _dnd_kit_sortable__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @dnd-kit/sortable */ "./node_modules/@dnd-kit/sortable/dist/sortable.esm.js");
+/* harmony import */ var _hooks_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./hooks.js */ "./js/hooks.js");
+/* harmony import */ var _components_js__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./components.js */ "./js/components.js");
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! react/jsx-runtime */ "react/jsx-runtime");
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5___default = /*#__PURE__*/__webpack_require__.n(react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__);
+/**
+ * WordPress Authors and Groups Editor Panel
+ *
+ * Provides a document settings panel in the block editor for selecting
+ * authors and user groups for posts and pages.
+ *
+ * @package wp-authors-and-groups
+ */
 
+
+
+
+
+
+
+const {
+  registerPlugin
+} = wp.plugins;
+const {
+  PluginDocumentSettingPanel
+} = wp.editPost;
+const {
+  useSelect
+} = wp.data;
+const {
+  __
+} = wp.i18n;
+
+/**
+ * Author Groups Panel Component
+ *
+ * Renders a document settings panel with a grouped react-select dropdown for selecting
+ * user groups and individual users as authors, with drag-and-drop reordering.
+ *
+ * @return {JSX.Element|null} The panel component or null if not applicable.
+ */
+const AuthorGroupsPanel = () => {
+  const {
+    meta,
+    postType
+  } = useSelect(select => {
+    const editor = select('core/editor');
+    return {
+      meta: editor.getEditedPostAttribute('meta'),
+      postType: editor.getCurrentPostType()
+    };
+  }, []);
+
+  // Use custom hooks
+  const {
+    users,
+    isLoadingUsers
+  } = (0,_hooks_js__WEBPACK_IMPORTED_MODULE_3__.useUsers)();
+  const {
+    userGroups,
+    isLoadingGroups
+  } = (0,_hooks_js__WEBPACK_IMPORTED_MODULE_3__.useUserGroups)();
+  const {
+    groupOptions,
+    userOptions,
+    groupedOptions
+  } = (0,_hooks_js__WEBPACK_IMPORTED_MODULE_3__.useSelectOptions)(users, userGroups);
+  const selectedOptions = (0,_hooks_js__WEBPACK_IMPORTED_MODULE_3__.useSelectedOptions)(meta, groupOptions, userOptions);
+  const handleCombinedChange = (0,_hooks_js__WEBPACK_IMPORTED_MODULE_3__.useCombinedChange)();
+  const {
+    sensors,
+    handleDragEnd
+  } = (0,_hooks_js__WEBPACK_IMPORTED_MODULE_3__.useDragAndDrop)(selectedOptions, handleCombinedChange);
+
+  // Set default author on mount
+  (0,_hooks_js__WEBPACK_IMPORTED_MODULE_3__.useDefaultAuthor)();
+
+  // Only show for posts and pages
+  if (postType !== 'post' && postType !== 'page') {
+    return null;
+  }
+  const isLoading = isLoadingUsers || isLoadingGroups;
+  return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(PluginDocumentSettingPanel, {
+    name: "wp-authors-and-groups-panel",
+    title: __('Authors and Groups', 'wp-authors-and-groups'),
+    className: "wp-authors-and-groups-panel",
+    initialOpen: true,
+    children: isLoading ? /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)("p", {
+      children: __('Loading...', 'wp-authors-and-groups')
+    }) : /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.Fragment, {
+      children: groupedOptions.length > 0 ? /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)("div", {
+        className: "wp-authors-and-groups-section",
+        children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_dnd_kit_core__WEBPACK_IMPORTED_MODULE_1__.DndContext, {
+          sensors: sensors,
+          collisionDetection: _dnd_kit_core__WEBPACK_IMPORTED_MODULE_1__.closestCenter,
+          onDragEnd: handleDragEnd,
+          children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(_dnd_kit_sortable__WEBPACK_IMPORTED_MODULE_2__.SortableContext, {
+            items: selectedOptions.map(opt => opt.value),
+            strategy: _dnd_kit_sortable__WEBPACK_IMPORTED_MODULE_2__.horizontalListSortingStrategy,
+            children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)(react_select__WEBPACK_IMPORTED_MODULE_0__["default"], {
+              isMulti: true,
+              options: groupedOptions,
+              value: selectedOptions,
+              onChange: handleCombinedChange,
+              placeholder: __('Select users and groups...', 'wp-authors-and-groups'),
+              className: "wp-authors-and-groups-select",
+              classNamePrefix: "wp-authors-and-groups-select",
+              isSearchable: false,
+              isClearable: false,
+              components: {
+                MultiValue: _components_js__WEBPACK_IMPORTED_MODULE_4__.DraggableMultiValue
+              }
+            })
+          })
+        })
+      }) : /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)("p", {
+        children: __('No user groups or users found.', 'wp-authors-and-groups')
+      })
+    })
+  });
+};
+registerPlugin('wp-authors-and-groups', {
+  render: AuthorGroupsPanel,
+  icon: 'groups'
+});
 })();
 
 /******/ })()
