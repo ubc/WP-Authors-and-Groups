@@ -23,6 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 add_action( 'enqueue_block_editor_assets', __NAMESPACE__ . '\\enqueue_scripts', 99 );
 add_action( 'init', __NAMESPACE__ . '\\register_meta_fields' );
 add_action( 'rest_api_init', __NAMESPACE__ . '\\register_rest_routes' );
+add_action( 'admin_init', __NAMESPACE__ . '\\ensure_current_user_on_site' );
 
 /**
  * Enqueues the necessary scripts and styles for the editor.
@@ -187,6 +188,18 @@ function register_rest_routes() {
 			},
 		)
 	);
+
+	register_rest_route(
+		'wp-authors-and-groups/v1',
+		'/current-user-groups',
+		array(
+			'methods'             => 'GET',
+			'callback'            => __NAMESPACE__ . '\\get_current_user_groups',
+			'permission_callback' => function () {
+				return current_user_can( 'edit_posts' );
+			},
+		)
+	);
 }
 
 /**
@@ -220,6 +233,84 @@ function get_user_groups() {
 
 	// Ensure we have an array (get_terms can return WP_Error or array).
 	if ( ! is_array( $terms ) ) {
+		return rest_ensure_response( array() );
+	}
+
+	// Format terms for REST API response.
+	$groups = array_map(
+		function ( $term ) {
+			return array(
+				'id'   => isset( $term->term_id ) ? (int) $term->term_id : 0,
+				'name' => isset( $term->name ) ? sanitize_text_field( $term->name ) : '',
+				'slug' => isset( $term->slug ) ? sanitize_text_field( $term->slug ) : '',
+			);
+		},
+		$terms
+	);
+
+	return rest_ensure_response( $groups );
+}
+
+/**
+ * Ensures the current user is added to the site (for multisite).
+ * Runs on admin_init to check and add user before any admin operations.
+ *
+ * @return void
+ */
+function ensure_current_user_on_site() {
+	// Only run for multisite.
+	if ( ! is_multisite() ) {
+		return;
+	}
+
+	// Get current user ID.
+	$user_id = get_current_user_id();
+
+	if ( ! $user_id ) {
+		return;
+	}
+
+	$blog_id = get_current_blog_id();
+	$user    = get_userdata( $user_id );
+
+	// Check if user exists and is not a member of the current site.
+	if ( $user && ! is_user_member_of_blog( $user_id, $blog_id ) ) {
+		// Add user to the site with subscriber role (minimum role needed).
+		add_user_to_blog( $blog_id, $user_id, 'subscriber' );
+	}
+}
+
+/**
+ * Gets groups for the current user.
+ *
+ * @return WP_REST_Response|WP_Error
+ */
+function get_current_user_groups() {
+	// Check if wp-user-groups plugin is active.
+	if ( ! taxonomy_exists( 'user-group' ) ) {
+		return new \WP_Error(
+			'user_groups_not_found',
+			__( 'User groups taxonomy not found. Please ensure WP User Groups plugin is active.', 'wp-authors-and-groups' ),
+			array( 'status' => 404 )
+		);
+	}
+
+	// Get current user ID.
+	$user_id = get_current_user_id();
+
+	if ( ! $user_id ) {
+		return rest_ensure_response( array() );
+	}
+
+	// Check if wp_get_terms_for_user function exists (from wp-user-groups plugin).
+	if ( ! function_exists( 'wp_get_terms_for_user' ) ) {
+		return rest_ensure_response( array() );
+	}
+
+	// Get terms for the current user.
+	$terms = wp_get_terms_for_user( $user_id, 'user-group' );
+
+	if ( is_wp_error( $terms ) || ! is_array( $terms ) || empty( $terms ) ) {
 		return rest_ensure_response( array() );
 	}
 

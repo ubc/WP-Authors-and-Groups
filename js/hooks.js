@@ -32,17 +32,20 @@ export const useUsers = () => {
 	const [isLoadingUsers, setIsLoadingUsers] = useState(true);
 
 	useEffect(() => {
-		apiFetch({
-			path: '/wp/v2/users?per_page=100&orderby=name&order=asc',
-		})
-			.then((fetchedUsers) => {
+		const fetchUsers = async () => {
+			try {
+				const fetchedUsers = await apiFetch({
+					path: '/wp/v2/users?per_page=100&orderby=name&order=asc',
+				});
 				setUsers(Array.isArray(fetchedUsers) ? fetchedUsers : []);
 				setIsLoadingUsers(false);
-			})
-			.catch(() => {
+			} catch (error) {
 				// Silently handle error - users list will remain empty
 				setIsLoadingUsers(false);
-			});
+			}
+		};
+
+		fetchUsers();
 	}, []);
 
 	return { users, isLoadingUsers };
@@ -58,17 +61,20 @@ export const useUserGroups = () => {
 	const [isLoadingGroups, setIsLoadingGroups] = useState(true);
 
 	useEffect(() => {
-		apiFetch({
-			path: '/wp-authors-and-groups/v1/user-groups',
-		})
-			.then((fetchedGroups) => {
+		const fetchUserGroups = async () => {
+			try {
+				const fetchedGroups = await apiFetch({
+					path: '/wp-authors-and-groups/v1/user-groups',
+				});
 				setUserGroups(Array.isArray(fetchedGroups) ? fetchedGroups : []);
 				setIsLoadingGroups(false);
-			})
-			.catch(() => {
+			} catch (error) {
 				// Silently handle error - groups list will remain empty
 				setIsLoadingGroups(false);
-			});
+			}
+		};
+
+		fetchUserGroups();
 	}, []);
 
 	return { userGroups, isLoadingGroups };
@@ -242,6 +248,7 @@ export const useCombinedChange = () => {
 
 /**
  * Custom hook to set default author when both users and groups are empty.
+ * Checks if current user belongs to groups first, then falls back to current user.
  *
  * @return {void}
  */
@@ -249,7 +256,7 @@ export const useDefaultAuthor = () => {
 	const registry = useRegistry();
 	const { editPost } = useDispatch('core/editor');
 
-	// Default to post author if both selected users and groups are empty (only on mount)
+	// Default selection logic when component first mounts (only on mount)
 	// Note: Intentionally using empty dependency array to run only once on mount.
 	// registry and editPost are stable references from hooks and don't need to be in deps.
 	useEffect(() => {
@@ -271,19 +278,80 @@ export const useDefaultAuthor = () => {
 			? currentMeta['wp_authors_and_groups_selected_groups']
 			: [];
 
-		// If both are empty and we have an author, set the author as default
+		// Only proceed if both are empty (nothing selected yet)
 		if (metaUsers.length === 0 && metaGroups.length === 0) {
-			const authorId = parseInt(currentAuthor, 10);
+			const setDefaultSelection = async () => {
+				try {
+					// First, get the current logged-in user (not the post author)
+					const currentUser = await apiFetch({
+						path: '/wp/v2/users/me',
+					});
+					
+					const currentUserId = currentUser?.id;
+					
+					if (!currentUserId) {
+						const authorId = parseInt(currentAuthor, 10);
+						if (authorId && !isNaN(authorId)) {
+							const newMeta = {
+								...currentMeta,
+								wp_authors_and_groups_selected_users: [authorId],
+								wp_authors_and_groups_selected_order: [`user-${authorId}`],
+							};
+							editPost({ meta: newMeta });
+						}
+						return;
+					}
+					
+					// Now check if current user belongs to any groups
+					const userGroups = await apiFetch({
+						path: '/wp-authors-and-groups/v1/current-user-groups',
+					});
+					
+					if (Array.isArray(userGroups) && userGroups.length > 0) {
+						// User belongs to groups - select the first group
+						const firstGroupId = userGroups[0].id;
+						
+						if (firstGroupId) {
+							const newMeta = {
+								...currentMeta,
+								wp_authors_and_groups_selected_groups: [firstGroupId],
+								wp_authors_and_groups_selected_order: [`group-${firstGroupId}`],
+							};
+							editPost({
+								meta: newMeta,
+							});
+						}
+					} else {
+						// User doesn't belong to any groups - select the current logged-in user
+						if (currentUserId) {
+							const newMeta = {
+								...currentMeta,
+								wp_authors_and_groups_selected_users: [currentUserId],
+								wp_authors_and_groups_selected_order: [`user-${currentUserId}`],
+							};
+							editPost({
+								meta: newMeta,
+							});
+						}
+					}
+				} catch (error) {
+					// If API call fails, fall back to selecting current logged-in user or post author
+					const authorId = parseInt(currentAuthor, 10);
+					
+					if (authorId && !isNaN(authorId)) {
+						const newMeta = {
+							...currentMeta,
+							wp_authors_and_groups_selected_users: [authorId],
+							wp_authors_and_groups_selected_order: [`user-${authorId}`],
+						};
+						editPost({
+							meta: newMeta,
+						});
+					}
+				}
+			};
 
-			// Only set if we have a valid author ID
-			if (authorId && !isNaN(authorId)) {
-				editPost({
-					meta: {
-						...currentMeta,
-						wp_authors_and_groups_selected_users: [authorId],
-					},
-				});
-			}
+			setDefaultSelection();
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []); // Empty dependency array - only runs on mount
