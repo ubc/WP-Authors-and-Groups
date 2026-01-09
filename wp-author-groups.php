@@ -400,8 +400,22 @@ function get_formatted_authors_and_groups( $post_id ) {
 		}
 	}
 
-	// Return comma-separated list.
-	return implode( ', ', $names );
+	// Return comma-separated list with "and" before the last item.
+	if ( empty( $names ) ) {
+		return '';
+	}
+
+	if ( count( $names ) === 1 ) {
+		return $names[0];
+	}
+
+	if ( count( $names ) === 2 ) {
+		return $names[0] . ' and ' . $names[1];
+	}
+
+	// For 3+ items: "Item1, Item2, Item3 and Item4".
+	$last_item = array_pop( $names );
+	return implode( ', ', $names ) . ' and ' . $last_item;
 }
 
 /**
