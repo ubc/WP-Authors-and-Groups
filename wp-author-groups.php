@@ -43,7 +43,6 @@ function enqueue_scripts() {
 			array(
 				'wp-plugins',
 				'wp-edit-post',
-				'wp-components',
 				'wp-data',
 				'wp-element',
 				'wp-i18n',
@@ -135,6 +134,33 @@ function register_meta_fields() {
 						return array();
 					}
 					return array_map( 'absint', $value );
+				},
+				'auth_callback'     => function () {
+					return current_user_can( 'edit_posts' );
+				},
+			)
+		);
+
+		register_post_meta(
+			$post_type,
+			'wp_authors_and_groups_selected_order',
+			array(
+				'show_in_rest'      => array(
+					'schema' => array(
+						'type'  => 'array',
+						'items' => array(
+							'type' => 'string',
+						),
+					),
+				),
+				'single'            => true,
+				'type'              => 'array',
+				'default'           => array(),
+				'sanitize_callback' => function ( $value ) {
+					if ( ! is_array( $value ) ) {
+						return array();
+					}
+					return array_map( 'sanitize_text_field', $value );
 				},
 				'auth_callback'     => function () {
 					return current_user_can( 'edit_posts' );
