@@ -248,7 +248,7 @@ export const useCombinedChange = () => {
 
 /**
  * Custom hook to set default author when both users and groups are empty.
- * Checks if current user belongs to groups first, then falls back to current user.
+ * Selects the current logged-in user as default.
  *
  * @return {void}
  */
@@ -282,14 +282,25 @@ export const useDefaultAuthor = () => {
 		if (metaUsers.length === 0 && metaGroups.length === 0) {
 			const setDefaultSelection = async () => {
 				try {
-					// First, get the current logged-in user (not the post author)
+					// Get the current logged-in user (not the post author)
 					const currentUser = await apiFetch({
 						path: '/wp/v2/users/me',
 					});
 					
 					const currentUserId = currentUser?.id;
 					
-					if (!currentUserId) {
+					// Select the current logged-in user as default
+					if (currentUserId) {
+						const newMeta = {
+							...currentMeta,
+							wp_authors_and_groups_selected_users: [currentUserId],
+							wp_authors_and_groups_selected_order: [`user-${currentUserId}`],
+						};
+						editPost({
+							meta: newMeta,
+						});
+					} else {
+						// Fallback to post author if current user is not available
 						const authorId = parseInt(currentAuthor, 10);
 						if (authorId && !isNaN(authorId)) {
 							const newMeta = {
@@ -299,43 +310,9 @@ export const useDefaultAuthor = () => {
 							};
 							editPost({ meta: newMeta });
 						}
-						return;
-					}
-					
-					// Now check if current user belongs to any groups
-					const userGroups = await apiFetch({
-						path: '/wp-authors-and-groups/v1/current-user-groups',
-					});
-					
-					if (Array.isArray(userGroups) && userGroups.length > 0) {
-						// User belongs to groups - select the first group
-						const firstGroupId = userGroups[0].id;
-						
-						if (firstGroupId) {
-							const newMeta = {
-								...currentMeta,
-								wp_authors_and_groups_selected_groups: [firstGroupId],
-								wp_authors_and_groups_selected_order: [`group-${firstGroupId}`],
-							};
-							editPost({
-								meta: newMeta,
-							});
-						}
-					} else {
-						// User doesn't belong to any groups - select the current logged-in user
-						if (currentUserId) {
-							const newMeta = {
-								...currentMeta,
-								wp_authors_and_groups_selected_users: [currentUserId],
-								wp_authors_and_groups_selected_order: [`user-${currentUserId}`],
-							};
-							editPost({
-								meta: newMeta,
-							});
-						}
 					}
 				} catch (error) {
-					// If API call fails, fall back to selecting current logged-in user or post author
+					// If API call fails, fall back to selecting post author
 					const authorId = parseInt(currentAuthor, 10);
 					
 					if (authorId && !isNaN(authorId)) {

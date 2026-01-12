@@ -60,8 +60,9 @@ const AuthorGroupsPanel = () => {
 	// Set default author on mount
 	useDefaultAuthor();
 
-	// Only show for posts and pages
-	if (postType !== 'post' && postType !== 'page') {
+	// Only show for supported post types
+	const supportedPostTypes = wpAuthorsAndGroups?.supportedPostTypes || ['post'];
+	if (!supportedPostTypes.includes(postType)) {
 		return null;
 	}
 

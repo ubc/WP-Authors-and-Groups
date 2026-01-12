@@ -25,26 +25,8 @@ if ( ! defined( 'WP_AUTHORS_AND_GROUPS_POST_TYPES' ) ) {
 	define( 'WP_AUTHORS_AND_GROUPS_POST_TYPES', array( 'post' ) );
 }
 
-/**
- * Gets the supported post types.
- *
- * @return array Array of supported post type slugs.
- */
-function get_supported_post_types() {
-	$post_types = WP_AUTHORS_AND_GROUPS_POST_TYPES;
-	return is_array( $post_types ) ? $post_types : array( 'post' );
-}
-
-/**
- * Checks if a post type is supported.
- *
- * @param string $post_type Post type slug.
- * @return bool True if supported, false otherwise.
- */
-function is_post_type_supported( $post_type ) {
-	$supported = get_supported_post_types();
-	return in_array( $post_type, $supported, true );
-}
+// Load helper functions.
+require_once plugin_dir_path( __FILE__ ) . 'includes/helper.php';
 
 add_action( 'enqueue_block_editor_assets', __NAMESPACE__ . '\\enqueue_scripts', 99 );
 add_action( 'init', __NAMESPACE__ . '\\register_meta_fields' );
@@ -89,6 +71,15 @@ function enqueue_scripts() {
 			),
 			filemtime( $editor_js_path ),
 			true
+		);
+
+		// Localize script with supported post types.
+		wp_localize_script(
+			'wp-authors-and-groups-script',
+			'wpAuthorsAndGroups',
+			array(
+				'supportedPostTypes' => get_supported_post_types(),
+			)
 		);
 	}
 
@@ -149,7 +140,7 @@ function modify_user_group_taxonomy_args( $args, $taxonomy ) {
 }
 
 /**
- * Registers custom meta fields for posts and pages.
+ * Registers custom meta fields for supported post types.
  *
  * @return void
  */
@@ -157,87 +148,20 @@ function register_meta_fields() {
 	// Get supported post types.
 	$post_types = get_supported_post_types();
 
+	$meta_fields = array(
+		'wp_authors_and_groups_selected_users'  => 'users',
+		'wp_authors_and_groups_selected_groups' => 'groups',
+		'wp_authors_and_groups_selected_order'  => 'order',
+	);
+
 	foreach ( $post_types as $post_type ) {
-		register_post_meta(
-			$post_type,
-			'wp_authors_and_groups_selected_users',
-			array(
-				'show_in_rest'      => array(
-					'schema' => array(
-						'type'  => 'array',
-						'items' => array(
-							'type' => 'integer',
-						),
-					),
-				),
-				'single'            => true,
-				'type'              => 'array',
-				'default'           => array(),
-				'sanitize_callback' => function ( $value ) {
-					if ( ! is_array( $value ) ) {
-						return array();
-					}
-					return array_map( 'absint', $value );
-				},
-				'auth_callback'     => function () {
-					return current_user_can( 'edit_posts' );
-				},
-			)
-		);
-
-		register_post_meta(
-			$post_type,
-			'wp_authors_and_groups_selected_groups',
-			array(
-				'show_in_rest'      => array(
-					'schema' => array(
-						'type'  => 'array',
-						'items' => array(
-							'type' => 'integer',
-						),
-					),
-				),
-				'single'            => true,
-				'type'              => 'array',
-				'default'           => array(),
-				'sanitize_callback' => function ( $value ) {
-					if ( ! is_array( $value ) ) {
-						return array();
-					}
-					return array_map( 'absint', $value );
-				},
-				'auth_callback'     => function () {
-					return current_user_can( 'edit_posts' );
-				},
-			)
-		);
-
-		register_post_meta(
-			$post_type,
-			'wp_authors_and_groups_selected_order',
-			array(
-				'show_in_rest'      => array(
-					'schema' => array(
-						'type'  => 'array',
-						'items' => array(
-							'type' => 'string',
-						),
-					),
-				),
-				'single'            => true,
-				'type'              => 'array',
-				'default'           => array(),
-				'sanitize_callback' => function ( $value ) {
-					if ( ! is_array( $value ) ) {
-						return array();
-					}
-					return array_map( 'sanitize_text_field', $value );
-				},
-				'auth_callback'     => function () {
-					return current_user_can( 'edit_posts' );
-				},
-			)
-		);
+		foreach ( $meta_fields as $meta_key => $field_type ) {
+			register_post_meta(
+				$post_type,
+				$meta_key,
+				get_meta_field_config( $field_type )
+			);
+		}
 	}
 }
 
@@ -253,18 +177,6 @@ function register_rest_routes() {
 		array(
 			'methods'             => 'GET',
 			'callback'            => __NAMESPACE__ . '\\get_user_groups',
-			'permission_callback' => function () {
-				return current_user_can( 'edit_posts' );
-			},
-		)
-	);
-
-	register_rest_route(
-		'wp-authors-and-groups/v1',
-		'/current-user-groups',
-		array(
-			'methods'             => 'GET',
-			'callback'            => __NAMESPACE__ . '\\get_current_user_groups',
 			'permission_callback' => function () {
 				return current_user_can( 'edit_posts' );
 			},
@@ -301,23 +213,8 @@ function get_user_groups() {
 		return $terms;
 	}
 
-	// Ensure we have an array (get_terms can return WP_Error or array).
-	if ( ! is_array( $terms ) ) {
-		return rest_ensure_response( array() );
-	}
-
-	// Format terms for REST API response.
-	$groups = array_map(
-		function ( $term ) {
-			return array(
-				'id'   => isset( $term->term_id ) ? (int) $term->term_id : 0,
-				'name' => isset( $term->name ) ? sanitize_text_field( $term->name ) : '',
-				'slug' => isset( $term->slug ) ? sanitize_text_field( $term->slug ) : '',
-			);
-		},
-		$terms
-	);
-
+	// Format and return terms.
+	$groups = format_terms_for_api( $terms );
 	return rest_ensure_response( $groups );
 }
 
@@ -348,55 +245,6 @@ function ensure_current_user_on_site() {
 		// Add user to the site with subscriber role (minimum role needed).
 		add_user_to_blog( $blog_id, $user_id, 'subscriber' );
 	}
-}
-
-/**
- * Gets groups for the current user.
- *
- * @return WP_REST_Response|WP_Error
- */
-function get_current_user_groups() {
-	// Check if wp-user-groups plugin is active.
-	if ( ! taxonomy_exists( 'user-group' ) ) {
-		return new \WP_Error(
-			'user_groups_not_found',
-			__( 'User groups taxonomy not found. Please ensure WP User Groups plugin is active.', 'wp-authors-and-groups' ),
-			array( 'status' => 404 )
-		);
-	}
-
-	// Get current user ID.
-	$user_id = get_current_user_id();
-
-	if ( ! $user_id ) {
-		return rest_ensure_response( array() );
-	}
-
-	// Check if wp_get_terms_for_user function exists (from wp-user-groups plugin).
-	if ( ! function_exists( 'wp_get_terms_for_user' ) ) {
-		return rest_ensure_response( array() );
-	}
-
-	// Get terms for the current user.
-	$terms = wp_get_terms_for_user( $user_id, 'user-group' );
-
-	if ( is_wp_error( $terms ) || ! is_array( $terms ) || empty( $terms ) ) {
-		return rest_ensure_response( array() );
-	}
-
-	// Format terms for REST API response.
-	$groups = array_map(
-		function ( $term ) {
-			return array(
-				'id'   => isset( $term->term_id ) ? (int) $term->term_id : 0,
-				'name' => isset( $term->name ) ? sanitize_text_field( $term->name ) : '',
-				'slug' => isset( $term->slug ) ? sanitize_text_field( $term->slug ) : '',
-			);
-		},
-		$terms
-	);
-
-	return rest_ensure_response( $groups );
 }
 
 /**
@@ -441,17 +289,17 @@ function get_formatted_authors_and_groups( $post_id ) {
 			if ( strpos( $prefixed_value, 'user-' ) === 0 ) {
 				$user_id = absint( str_replace( 'user-', '', $prefixed_value ) );
 				if ( $user_id && in_array( $user_id, $selected_users, true ) ) {
-					$user = get_userdata( $user_id );
-					if ( $user ) {
-						$names[] = $user->display_name;
+					$name = get_user_display_name( $user_id );
+					if ( $name ) {
+						$names[] = $name;
 					}
 				}
 			} elseif ( strpos( $prefixed_value, 'group-' ) === 0 ) {
 				$group_id = absint( str_replace( 'group-', '', $prefixed_value ) );
 				if ( $group_id && in_array( $group_id, $selected_groups, true ) ) {
-					$term = get_term( $group_id, 'user-group' );
-					if ( $term && ! is_wp_error( $term ) ) {
-						$names[] = $term->name;
+					$name = get_group_name( $group_id );
+					if ( $name ) {
+						$names[] = $name;
 					}
 				}
 			}
@@ -459,38 +307,21 @@ function get_formatted_authors_and_groups( $post_id ) {
 	} else {
 		// Fallback: groups first, then users.
 		foreach ( $selected_groups as $group_id ) {
-			$group_id = absint( $group_id );
-			$term     = get_term( $group_id, 'user-group' );
-			if ( $term && ! is_wp_error( $term ) ) {
-				$names[] = $term->name;
+			$name = get_group_name( $group_id );
+			if ( $name ) {
+				$names[] = $name;
 			}
 		}
 
 		foreach ( $selected_users as $user_id ) {
-			$user_id = absint( $user_id );
-			$user    = get_userdata( $user_id );
-			if ( $user ) {
-				$names[] = $user->display_name;
+			$name = get_user_display_name( $user_id );
+			if ( $name ) {
+				$names[] = $name;
 			}
 		}
 	}
 
-	// Return comma-separated list with "and" before the last item.
-	if ( empty( $names ) ) {
-		return '';
-	}
-
-	if ( count( $names ) === 1 ) {
-		return $names[0];
-	}
-
-	if ( count( $names ) === 2 ) {
-		return $names[0] . ' and ' . $names[1];
-	}
-
-	// For 3+ items: "Item1, Item2, Item3 and Item4".
-	$last_item = array_pop( $names );
-	return implode( ', ', $names ) . ' and ' . $last_item;
+	return format_names_list( $names );
 }
 
 /**
@@ -519,8 +350,6 @@ function filter_author_display( $display_name ) {
 	}
 
 	$formatted = get_formatted_authors_and_groups( $post->ID );
-
-	error_log( 'formatted: ' . print_r( $formatted, true ) );
 
 	// If we have custom authors/groups, return them.
 	if ( ! empty( $formatted ) ) {
@@ -588,7 +417,6 @@ function filter_author_link( $link ) {
 		if ( strpos( $first_item, 'user-' ) === 0 ) {
 			$user_id = absint( str_replace( 'user-', '', $first_item ) );
 			if ( $user_id && in_array( $user_id, $selected_users, true ) ) {
-				// Temporarily remove filter to prevent recursion.
 				remove_filter( 'author_link', __NAMESPACE__ . '\\filter_author_link', 10 );
 				$result = get_author_posts_url( $user_id );
 				add_filter( 'author_link', __NAMESPACE__ . '\\filter_author_link', 10, 1 );
@@ -613,7 +441,6 @@ function filter_author_link( $link ) {
 	}
 
 	if ( $result === $link && ! empty( $selected_users ) ) {
-		// Temporarily remove filter to prevent recursion.
 		remove_filter( 'author_link', __NAMESPACE__ . '\\filter_author_link', 10 );
 		$result = get_author_posts_url( $selected_users[0] );
 		add_filter( 'author_link', __NAMESPACE__ . '\\filter_author_link', 10, 1 );
