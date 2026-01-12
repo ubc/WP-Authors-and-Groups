@@ -20,6 +20,32 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+// Define supported post types. Default to 'post' only.
+if ( ! defined( 'WP_AUTHORS_AND_GROUPS_POST_TYPES' ) ) {
+	define( 'WP_AUTHORS_AND_GROUPS_POST_TYPES', array( 'post' ) );
+}
+
+/**
+ * Gets the supported post types.
+ *
+ * @return array Array of supported post type slugs.
+ */
+function get_supported_post_types() {
+	$post_types = WP_AUTHORS_AND_GROUPS_POST_TYPES;
+	return is_array( $post_types ) ? $post_types : array( 'post' );
+}
+
+/**
+ * Checks if a post type is supported.
+ *
+ * @param string $post_type Post type slug.
+ * @return bool True if supported, false otherwise.
+ */
+function is_post_type_supported( $post_type ) {
+	$supported = get_supported_post_types();
+	return in_array( $post_type, $supported, true );
+}
+
 add_action( 'enqueue_block_editor_assets', __NAMESPACE__ . '\\enqueue_scripts', 99 );
 add_action( 'init', __NAMESPACE__ . '\\register_meta_fields' );
 add_action( 'rest_api_init', __NAMESPACE__ . '\\register_rest_routes' );
@@ -32,11 +58,17 @@ add_filter( 'get_the_author_display_name', __NAMESPACE__ . '\\filter_author_disp
 add_filter( 'author_link', __NAMESPACE__ . '\\filter_author_link', 10, 1 );
 
 /**
- * Enqueues the necessary scripts and styles for the editor.
+ * Enqueues the necessary scripts and styles for the editor post/page author setting.
  *
  * @return void
  */
 function enqueue_scripts() {
+	// Only enqueue for supported post types.
+	$screen = get_current_screen();
+	if ( ! $screen || ! is_post_type_supported( $screen->post_type ) ) {
+		return;
+	}
+
 	$plugin_dir_path = plugin_dir_path( __FILE__ );
 	$plugin_dir_url  = plugin_dir_url( __FILE__ );
 
@@ -122,7 +154,8 @@ function modify_user_group_taxonomy_args( $args, $taxonomy ) {
  * @return void
  */
 function register_meta_fields() {
-	$post_types = array( 'post', 'page' );
+	// Get supported post types.
+	$post_types = get_supported_post_types();
 
 	foreach ( $post_types as $post_type ) {
 		register_post_meta(
@@ -379,6 +412,12 @@ function get_formatted_authors_and_groups( $post_id ) {
 		return '';
 	}
 
+	// Check if post type is supported.
+	$post_type = get_post_type( $post_id );
+	if ( ! $post_type || ! is_post_type_supported( $post_type ) ) {
+		return '';
+	}
+
 	// Get meta values.
 	$selected_users  = get_post_meta( $post_id, 'wp_authors_and_groups_selected_users', true );
 	$selected_groups = get_post_meta( $post_id, 'wp_authors_and_groups_selected_groups', true );
@@ -468,6 +507,11 @@ function filter_author_display( $display_name ) {
 		return $display_name;
 	}
 
+	// Check if post type is supported.
+	if ( ! is_post_type_supported( $post->post_type ) ) {
+		return $display_name;
+	}
+
 	// On author archive pages, only apply if we're in the loop (displaying posts).
 	// Skip if we're displaying the archive page's author name (page header, not in loop).
 	if ( is_author() && ! in_the_loop() ) {
@@ -515,6 +559,18 @@ function filter_author_link( $link ) {
 	$filtering = true;
 
 	$post_id = get_the_ID();
+	if ( ! $post_id ) {
+		$filtering = false;
+		return $link;
+	}
+
+	// Check if post type is supported.
+	$post_type = get_post_type( $post_id );
+	if ( ! $post_type || ! is_post_type_supported( $post_type ) ) {
+		$filtering = false;
+		return $link;
+	}
+
 	$selected_users  = get_post_meta( $post_id, 'wp_authors_and_groups_selected_users', true );
 	$selected_groups = get_post_meta( $post_id, 'wp_authors_and_groups_selected_groups', true );
 	$selected_order  = get_post_meta( $post_id, 'wp_authors_and_groups_selected_order', true );
