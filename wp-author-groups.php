@@ -46,7 +46,10 @@ add_action( 'pre_get_posts', __NAMESPACE__ . '\\modify_author_archive_query' );
 add_action( 'pre_get_posts', __NAMESPACE__ . '\\modify_user_group_archive_query' );
 
 /**
- * Enqueues the necessary scripts and styles for the editor post/page author setting.
+ * Enqueues the necessary scripts and styles for the Block Editor.
+ *
+ * Loads the editor JavaScript and CSS files that power the author/group selection
+ * interface in the post settings panel. Only loads for supported post types.
  *
  * @return void
  */
@@ -79,10 +82,10 @@ function enqueue_scripts() {
 			true
 		);
 
-		// Localize script with supported post types.
+		// Pass supported post types to JavaScript for conditional rendering.
 		wp_localize_script(
 			'wp-authors-and-groups-script',
-			'wpAuthorsAndGroups',
+			'wp_authors_and_groups_data',
 			array(
 				'supportedPostTypes' => get_supported_post_types(),
 			)
@@ -138,8 +141,9 @@ function modify_user_group_taxonomy_args( $args, $taxonomy ) {
 		$args['rewrite'] = array();
 	}
 
+	// Set URL structure: /users/group/group-name/.
 	$args['rewrite']['slug']         = 'users/group';
-	$args['rewrite']['with_front']    = false;
+	$args['rewrite']['with_front']   = false;
 	$args['rewrite']['hierarchical'] = true;
 
 	return $args;
@@ -148,18 +152,27 @@ function modify_user_group_taxonomy_args( $args, $taxonomy ) {
 /**
  * Registers custom meta fields for supported post types.
  *
+ * Registers three meta fields for each supported post type:
+ * - wp_authors_and_groups_selected_users: Array of user IDs assigned to the post
+ * - wp_authors_and_groups_selected_groups: Array of group term IDs assigned to the post
+ * - wp_authors_and_groups_selected_order: Array preserving the display order of users/groups
+ *
+ * These fields are registered with REST API support for use in the Block Editor.
+ *
  * @return void
  */
 function register_meta_fields() {
-	// Get supported post types.
+	// Get supported post types (configurable via WP_AUTHORS_AND_GROUPS_POST_TYPES constant).
 	$post_types = get_supported_post_types();
 
+	// Define meta fields and their configuration types.
 	$meta_fields = array(
 		'wp_authors_and_groups_selected_users'  => 'users',
 		'wp_authors_and_groups_selected_groups' => 'groups',
 		'wp_authors_and_groups_selected_order'  => 'order',
 	);
 
+	// Register each meta field for each supported post type.
 	foreach ( $post_types as $post_type ) {
 		foreach ( $meta_fields as $meta_key => $field_type ) {
 			register_post_meta(
@@ -172,7 +185,10 @@ function register_meta_fields() {
 }
 
 /**
- * Registers REST API routes for user groups.
+ * Registers REST API routes for fetching user groups.
+ *
+ * Creates a REST endpoint at /wp-json/wp-authors-and-groups/v1/user-groups
+ * that returns all available user groups for use in the Block Editor interface.
  *
  * @return void
  */
@@ -191,12 +207,15 @@ function register_rest_routes() {
 }
 
 /**
- * Gets user groups from wp-user-groups plugin.
+ * Gets user groups from the wp-user-groups plugin via REST API.
  *
- * @return WP_REST_Response|WP_Error
+ * Retrieves all user groups from the 'user-group' taxonomy and formats them
+ * for use in the Block Editor. Requires the WP User Groups plugin to be active.
+ *
+ * @return WP_REST_Response|WP_Error REST API response with group data, or error if taxonomy not found.
  */
 function get_user_groups() {
-	// Check if wp-user-groups plugin is active.
+	// Check if wp-user-groups plugin is active and taxonomy exists.
 	if ( ! taxonomy_exists( 'user-group' ) ) {
 		return new \WP_Error(
 			'user_groups_not_found',
@@ -205,7 +224,7 @@ function get_user_groups() {
 		);
 	}
 
-	// Get terms from user-group taxonomy.
+	// Get all terms from user-group taxonomy, ordered alphabetically.
 	$terms = get_terms(
 		array(
 			'taxonomy'   => 'user-group',
@@ -219,7 +238,7 @@ function get_user_groups() {
 		return $terms;
 	}
 
-	// Format and return terms.
+	// Format terms for REST API response (id, name, slug).
 	$groups = format_terms_for_api( $terms );
 	return rest_ensure_response( $groups );
 }
@@ -256,8 +275,12 @@ function ensure_current_user_on_site() {
 /**
  * Gets formatted author and group names for a post.
  *
+ * Retrieves the assigned users and groups for a post and formats them as a
+ * readable string (e.g., "John Doe and Jane Smith" or "Group A, Group B and John Doe").
+ * Respects the stored order if available, otherwise displays groups first, then users.
+ *
  * @param int $post_id Post ID.
- * @return string Comma-separated list of author and group names.
+ * @return string Comma-separated list of author and group names, or empty string if none assigned.
  */
 function get_formatted_authors_and_groups( $post_id ) {
 	$post_id = absint( $post_id );
@@ -331,10 +354,14 @@ function get_formatted_authors_and_groups( $post_id ) {
 }
 
 /**
- * Filters the author display name.
+ * Filters the author display name to show assigned users/groups.
+ *
+ * Replaces the default author name with the formatted list of assigned users
+ * and groups. On author archive pages, only modifies names within the post loop,
+ * preserving the archive page header author name.
  *
  * @param string $display_name The author's display name.
- * @return string Modified author display name.
+ * @return string Modified author display name, or original if no custom assignment.
  */
 function filter_author_display( $display_name ) {
 	global $post;
@@ -378,15 +405,19 @@ function filter_author_display( $display_name ) {
 }
 
 /**
- * Filters the author posts link to use the link of first user or group assigned to the post.
+ * Filters the author posts link to use the first assigned user or group.
  *
- * @param string $link The author posts link.
- * @return string Modified author posts link.
+ * Modifies author links to point to the archive page of the first assigned user
+ * or group (based on stored order). If a user is first, links to their author archive.
+ * If a group is first, links to the group's term archive page.
+ *
+ * @param string $link The original author posts link.
+ * @return string Modified author posts link, or original if no assignment.
  */
 function filter_author_link( $link ) {
 	static $filtering = false;
 
-	// Prevent infinite recursion.
+	// Prevent infinite recursion when get_author_posts_url() triggers this filter.
 	if ( $filtering ) {
 		return $link;
 	}
@@ -466,13 +497,18 @@ function filter_author_link( $link ) {
 }
 
 /**
- * Modifies the author archive query to include posts assigned to the author via meta.
+ * Modifies the author archive query to show only posts assigned via metadata.
+ *
+ * Filters author archive pages to display only posts where the author is explicitly
+ * assigned via the wp_authors_and_groups_selected_users meta field. Posts where
+ * the author is only the original post author (without meta assignment) are excluded.
+ *
+ * Handles both serialized array and plain integer meta value formats.
  *
  * @param WP_Query $query The WP_Query instance.
  * @return void
  */
 function modify_author_archive_query( $query ) {
-
 	// Only modify main query on author archive pages.
 	if ( ! $query->is_main_query() || ! $query->is_author() ) {
 		return;
@@ -561,7 +597,13 @@ function modify_author_archive_query( $query ) {
 }
 
 /**
- * Modifies the user group archive query to include posts assigned to the group via meta.
+ * Modifies the user group archive query to show only posts assigned via metadata.
+ *
+ * Filters user group archive pages to display only posts where the group is explicitly
+ * assigned via the wp_authors_and_groups_selected_groups meta field. This ensures
+ * group archive pages only show posts that have been explicitly assigned to that group.
+ *
+ * Handles both serialized array and plain integer meta value formats.
  *
  * @param WP_Query $query The WP_Query instance.
  * @return void

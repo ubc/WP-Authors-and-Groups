@@ -2,6 +2,10 @@
 /**
  * Helper functions for WP Authors and Groups plugin.
  *
+ * This file contains utility functions used throughout the plugin for
+ * post type checking, meta field configuration, data formatting, and
+ * user/group name retrieval.
+ *
  * @package wp-authors-and-groups
  */
 
