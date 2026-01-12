@@ -42,6 +42,9 @@ add_filter( 'author_link', __NAMESPACE__ . '\\filter_author_link', 10, 1 );
 // Modify author archive query to include posts assigned via meta.
 add_action( 'pre_get_posts', __NAMESPACE__ . '\\modify_author_archive_query' );
 
+// Modify user group archive query to include posts assigned via meta.
+add_action( 'pre_get_posts', __NAMESPACE__ . '\\modify_user_group_archive_query' );
+
 /**
  * Enqueues the necessary scripts and styles for the editor post/page author setting.
  *
@@ -526,12 +529,122 @@ function modify_author_archive_query( $query ) {
 	$all_post_ids = array_map( 'absint', $user_meta_posts );
 	$all_post_ids = array_unique( $all_post_ids );
 
+	// Verify posts exist and are published before including them.
+	$valid_post_ids = array();
+	foreach ( $all_post_ids as $post_id ) {
+		$post = get_post( $post_id );
+		if ( $post && 'publish' === $post->post_status && is_post_type_supported( $post->post_type ) ) {
+			$valid_post_ids[] = $post_id;
+		}
+	}
+
+	if ( ! empty( $valid_post_ids ) ) {
+		// Use post__in to show only these posts.
+		$query->set( 'post__in', $valid_post_ids );
+		$query->set( 'orderby', 'post__in' );
+		// Remove all author-related query vars since we're using post__in.
+		$query->set( 'author', '' );
+		$query->set( 'author_name', '' );
+		$query->set( 'author__in', array() );
+		$query->set( 'author__not_in', array() );
+		// Unset author query vars directly.
+		unset( $query->query_vars['author'] );
+		unset( $query->query_vars['author_name'] );
+		// Ensure we're not filtering by post_status since we've already verified them.
+		$query->set( 'post_status', 'publish' );
+		// Ensure no limit is set that might exclude posts.
+		$query->set( 'posts_per_page', -1 );
+	} else {
+		// If no posts found, set to return nothing.
+		$query->set( 'post__in', array( 0 ) );
+	}
+}
+
+/**
+ * Modifies the user group archive query to include posts assigned to the group via meta.
+ *
+ * @param WP_Query $query The WP_Query instance.
+ * @return void
+ */
+function modify_user_group_archive_query( $query ) {
+	// Only modify main query on user-group taxonomy archive pages.
+	if ( ! $query->is_main_query() ) {
+		return;
+	}
+
+	// Check if this is a user-group taxonomy archive.
+	$queried_object = get_queried_object();
+	if ( ! $queried_object || ! isset( $queried_object->taxonomy ) || 'user-group' !== $queried_object->taxonomy ) {
+		return;
+	}
+
+	// Get the term ID.
+	$term_id = $query->get_queried_object_id();
+	if ( ! $term_id ) {
+		$term = get_queried_object();
+		if ( $term && isset( $term->term_id ) ) {
+			$term_id = $term->term_id;
+		}
+	}
+
+	if ( ! $term_id ) {
+		return;
+	}
+
+	// Get post type and ensure it's supported.
+	$post_type = $query->get( 'post_type' );
+	if ( empty( $post_type ) ) {
+		$post_type = 'post';
+	}
+	// Only process supported post types.
+	if ( ! is_post_type_supported( $post_type ) ) {
+		return;
+	}
+
+	global $wpdb;
+
+	// Get post IDs where group is in selected_groups meta.
+	// Query directly to handle both serialized arrays and multiple meta entries.
+	// Serialized array format: a:2:{i:0;i:1;i:1;i:200;}
+	// We need to match the value part: ;i:1; (semicolon before ensures it's a value, not an index).
+	$group_meta_posts = $wpdb->get_col(
+		$wpdb->prepare(
+			"SELECT DISTINCT pm.post_id 
+			FROM {$wpdb->postmeta} pm
+			INNER JOIN {$wpdb->posts} p ON pm.post_id = p.ID
+			WHERE pm.meta_key = %s 
+			AND p.post_type = %s
+			AND p.post_status = 'publish'
+			AND (
+				pm.meta_value = %d 
+				OR pm.meta_value = %s
+				OR pm.meta_value LIKE %s
+			)",
+			'wp_authors_and_groups_selected_groups',
+			$post_type,
+			$term_id,
+			(string) $term_id,
+			'%;i:' . $term_id . ';%'
+		)
+	);
+
+	// Only include posts where the group is directly assigned via selected_groups meta.
+	$all_post_ids = array_map( 'absint', $group_meta_posts );
+	$all_post_ids = array_unique( $all_post_ids );
+
 	if ( ! empty( $all_post_ids ) ) {
 		// Use post__in to show only these posts.
 		$query->set( 'post__in', $all_post_ids );
 		$query->set( 'orderby', 'post__in' );
-		// Remove author query since we're using post__in.
-		$query->set( 'author', '' );
+		// Remove taxonomy query since we're using post__in.
+		$query->set( 'tax_query', array() );
+		// Clear the term query to prevent taxonomy filtering.
+		$query->set( 'term', '' );
+		$query->set( 'taxonomy', '' );
+		// Unset the user-group query var that WordPress sets for taxonomy archives.
+		unset( $query->query_vars['user-group'] );
+		// Ensure post_type is set.
+		$query->set( 'post_type', $post_type );
 	} else {
 		// If no posts found, set to return nothing.
 		$query->set( 'post__in', array( 0 ) );
