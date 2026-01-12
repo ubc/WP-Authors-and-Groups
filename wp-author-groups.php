@@ -24,7 +24,12 @@ add_action( 'enqueue_block_editor_assets', __NAMESPACE__ . '\\enqueue_scripts', 
 add_action( 'init', __NAMESPACE__ . '\\register_meta_fields' );
 add_action( 'rest_api_init', __NAMESPACE__ . '\\register_rest_routes' );
 add_action( 'admin_init', __NAMESPACE__ . '\\ensure_current_user_on_site' );
+add_filter( 'register_taxonomy_args', __NAMESPACE__ . '\\modify_user_group_taxonomy_args', 10, 2 );
 add_filter( 'the_author', __NAMESPACE__ . '\\filter_author_display', 10, 1 );
+add_filter( 'get_the_author_display_name', __NAMESPACE__ . '\\filter_author_display', 10, 2 );
+
+// Filter the author posts link.
+add_filter( 'author_link', __NAMESPACE__ . '\\filter_author_link', 10, 1 );
 
 /**
  * Enqueues the necessary scripts and styles for the editor.
@@ -78,6 +83,37 @@ function enqueue_scripts() {
 			filemtime( $additional_css_path )
 		);
 	}
+}
+
+/**
+ * Modifies the user-group taxonomy arguments to enable single/archive pages.
+ *
+ * @param array  $args     Array of arguments for registering a taxonomy.
+ * @param string $taxonomy Taxonomy slug.
+ * @return array Modified taxonomy arguments.
+ */
+function modify_user_group_taxonomy_args( $args, $taxonomy ) {
+	// Only modify the user-group taxonomy.
+	if ( 'user-group' !== $taxonomy ) {
+		return $args;
+	}
+
+	// Enable public and archive pages.
+	$args['public']             = true;
+	$args['publicly_queryable'] = true;
+	$args['show_in_nav_menus']  = true;
+	$args['query_var']          = true;
+
+	// Ensure rewrite rules are set up properly.
+	if ( ! isset( $args['rewrite'] ) || ! is_array( $args['rewrite'] ) ) {
+		$args['rewrite'] = array();
+	}
+
+	$args['rewrite']['slug']         = 'users/group';
+	$args['rewrite']['with_front']    = false;
+	$args['rewrite']['hierarchical'] = true;
+
+	return $args;
 }
 
 /**
@@ -427,11 +463,20 @@ function get_formatted_authors_and_groups( $post_id ) {
 function filter_author_display( $display_name ) {
 	global $post;
 
+	// If no post, don't modify (e.g., author archive page header).
 	if ( ! $post || ! isset( $post->ID ) ) {
 		return $display_name;
 	}
 
+	// On author archive pages, only apply if we're in the loop (displaying posts).
+	// Skip if we're displaying the archive page's author name (page header, not in loop).
+	if ( is_author() && ! in_the_loop() ) {
+		return $display_name;
+	}
+
 	$formatted = get_formatted_authors_and_groups( $post->ID );
+
+	error_log( 'formatted: ' . print_r( $formatted, true ) );
 
 	// If we have custom authors/groups, return them.
 	if ( ! empty( $formatted ) ) {
@@ -451,4 +496,74 @@ function filter_author_display( $display_name ) {
 
 	// Final fallback to the original display name.
 	return $display_name;
+}
+
+/**
+ * Filters the author posts link to use the link of first user or group assigned to the post.
+ *
+ * @param string $link The author posts link.
+ * @return string Modified author posts link.
+ */
+function filter_author_link( $link ) {
+	static $filtering = false;
+
+	// Prevent infinite recursion.
+	if ( $filtering ) {
+		return $link;
+	}
+
+	$filtering = true;
+
+	$post_id = get_the_ID();
+	$selected_users  = get_post_meta( $post_id, 'wp_authors_and_groups_selected_users', true );
+	$selected_groups = get_post_meta( $post_id, 'wp_authors_and_groups_selected_groups', true );
+	$selected_order  = get_post_meta( $post_id, 'wp_authors_and_groups_selected_order', true );
+
+	// Ensure arrays.
+	$selected_users  = is_array( $selected_users ) ? $selected_users : array();
+	$selected_groups = is_array( $selected_groups ) ? $selected_groups : array();
+	$selected_order  = is_array( $selected_order ) ? $selected_order : array();
+
+	$result = $link;
+
+	// If we have stored order, use it to get the first item.
+	if ( ! empty( $selected_order ) ) {
+		$first_item = $selected_order[0];
+		if ( strpos( $first_item, 'user-' ) === 0 ) {
+			$user_id = absint( str_replace( 'user-', '', $first_item ) );
+			if ( $user_id && in_array( $user_id, $selected_users, true ) ) {
+				// Temporarily remove filter to prevent recursion.
+				remove_filter( 'author_link', __NAMESPACE__ . '\\filter_author_link', 10 );
+				$result = get_author_posts_url( $user_id );
+				add_filter( 'author_link', __NAMESPACE__ . '\\filter_author_link', 10, 1 );
+			}
+		} elseif ( strpos( $first_item, 'group-' ) === 0 ) {
+			$group_id = absint( str_replace( 'group-', '', $first_item ) );
+			if ( $group_id && in_array( $group_id, $selected_groups, true ) ) {
+				$term_link = get_term_link( $group_id, 'user-group' );
+				if ( ! is_wp_error( $term_link ) ) {
+					$result = $term_link;
+				}
+			}
+		}
+	}
+
+	// Fallback: groups first, then users (matching get_formatted_authors_and_groups).
+	if ( $result === $link && ! empty( $selected_groups ) ) {
+		$term_link = get_term_link( $selected_groups[0], 'user-group' );
+		if ( ! is_wp_error( $term_link ) ) {
+			$result = $term_link;
+		}
+	}
+
+	if ( $result === $link && ! empty( $selected_users ) ) {
+		// Temporarily remove filter to prevent recursion.
+		remove_filter( 'author_link', __NAMESPACE__ . '\\filter_author_link', 10 );
+		$result = get_author_posts_url( $selected_users[0] );
+		add_filter( 'author_link', __NAMESPACE__ . '\\filter_author_link', 10, 1 );
+	}
+
+	$filtering = false;
+
+	return $result;
 }
