@@ -85,7 +85,7 @@ function enqueue_scripts() {
 		// Pass supported post types to JavaScript for conditional rendering.
 		wp_localize_script(
 			'wp-authors-and-groups-script',
-			'wp_authors_and_groups_data',
+			'wpAuthorsAndGroups',
 			array(
 				'supportedPostTypes' => get_supported_post_types(),
 			)
