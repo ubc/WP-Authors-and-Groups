@@ -39,6 +39,9 @@ add_filter( 'get_the_author_display_name', __NAMESPACE__ . '\\filter_author_disp
 // Filter the author posts link.
 add_filter( 'author_link', __NAMESPACE__ . '\\filter_author_link', 10, 1 );
 
+// Modify author archive query to include posts assigned via meta.
+add_action( 'pre_get_posts', __NAMESPACE__ . '\\modify_author_archive_query' );
+
 /**
  * Enqueues the necessary scripts and styles for the editor post/page author setting.
  *
@@ -411,32 +414,40 @@ function filter_author_link( $link ) {
 
 	$result = $link;
 
-	// If we have stored order, use it to get the first item.
+	// If we have stored order, use it to get the first item (respects user/group order).
 	if ( ! empty( $selected_order ) ) {
 		$first_item = $selected_order[0];
 		if ( strpos( $first_item, 'user-' ) === 0 ) {
+			// First item is a user - return user's author archive link.
 			$user_id = absint( str_replace( 'user-', '', $first_item ) );
 			if ( $user_id && in_array( $user_id, $selected_users, true ) ) {
 				remove_filter( 'author_link', __NAMESPACE__ . '\\filter_author_link', 10 );
 				$result = get_author_posts_url( $user_id );
 				add_filter( 'author_link', __NAMESPACE__ . '\\filter_author_link', 10, 1 );
+				$filtering = false;
+				return $result;
 			}
 		} elseif ( strpos( $first_item, 'group-' ) === 0 ) {
+			// First item is a group - return group's term archive link.
 			$group_id = absint( str_replace( 'group-', '', $first_item ) );
 			if ( $group_id && in_array( $group_id, $selected_groups, true ) ) {
 				$term_link = get_term_link( $group_id, 'user-group' );
 				if ( ! is_wp_error( $term_link ) ) {
-					$result = $term_link;
+					$result    = $term_link;
+					$filtering = false;
+					return $result;
 				}
 			}
 		}
 	}
 
-	// Fallback: groups first, then users (matching get_formatted_authors_and_groups).
+	// Fallback: if no order stored, use groups first, then users (matching get_formatted_authors_and_groups).
 	if ( $result === $link && ! empty( $selected_groups ) ) {
 		$term_link = get_term_link( $selected_groups[0], 'user-group' );
 		if ( ! is_wp_error( $term_link ) ) {
 			$result = $term_link;
+			$filtering = false;
+			return $result;
 		}
 	}
 
@@ -449,4 +460,80 @@ function filter_author_link( $link ) {
 	$filtering = false;
 
 	return $result;
+}
+
+/**
+ * Modifies the author archive query to include posts assigned to the author via meta.
+ *
+ * @param WP_Query $query The WP_Query instance.
+ * @return void
+ */
+function modify_author_archive_query( $query ) {
+
+	// Only modify main query on author archive pages.
+	if ( ! $query->is_main_query() || ! $query->is_author() ) {
+		return;
+	}
+
+	// Get the author ID.
+	$author_id = $query->get( 'author' );
+	if ( ! $author_id ) {
+		$author_id = get_queried_object_id();
+	}
+
+	if ( ! $author_id ) {
+		return;
+	}
+
+	// Get post type and ensure it's supported.
+	$post_type = $query->get( 'post_type' );
+	if ( empty( $post_type ) ) {
+		$post_type = 'post';
+	}
+	// Only process supported post types.
+	if ( ! is_post_type_supported( $post_type ) ) {
+		return;
+	}
+
+	global $wpdb;
+
+	// Get post IDs where author is in selected_users meta.
+	// Query directly to handle both serialized arrays and multiple meta entries.
+	// Serialized array format: a:2:{i:0;i:1;i:1;i:200;}
+	// We need to match the value part: ;i:1; (semicolon before ensures it's a value, not an index).
+	$user_meta_posts = $wpdb->get_col(
+		$wpdb->prepare(
+			"SELECT DISTINCT pm.post_id 
+			FROM {$wpdb->postmeta} pm
+			INNER JOIN {$wpdb->posts} p ON pm.post_id = p.ID
+			WHERE pm.meta_key = %s 
+			AND p.post_type = %s
+			AND p.post_status = 'publish'
+			AND (
+				pm.meta_value = %d 
+				OR pm.meta_value = %s
+				OR pm.meta_value LIKE %s
+			)",
+			'wp_authors_and_groups_selected_users',
+			$post_type,
+			$author_id,
+			(string) $author_id,
+			'%;i:' . $author_id . ';%'
+		)
+	);
+
+	// Only include posts where the author is directly assigned via selected_users meta.
+	$all_post_ids = array_map( 'absint', $user_meta_posts );
+	$all_post_ids = array_unique( $all_post_ids );
+
+	if ( ! empty( $all_post_ids ) ) {
+		// Use post__in to show only these posts.
+		$query->set( 'post__in', $all_post_ids );
+		$query->set( 'orderby', 'post__in' );
+		// Remove author query since we're using post__in.
+		$query->set( 'author', '' );
+	} else {
+		// If no posts found, set to return nothing.
+		$query->set( 'post__in', array( 0 ) );
+	}
 }
