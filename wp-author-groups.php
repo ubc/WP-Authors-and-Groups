@@ -32,6 +32,7 @@ add_action( 'enqueue_block_editor_assets', __NAMESPACE__ . '\\enqueue_post_edito
 add_action( 'enqueue_block_editor_assets', __NAMESPACE__ . '\\enqueue_query_loop_filter_script', 99 );
 add_action( 'init', __NAMESPACE__ . '\\register_meta_fields' );
 add_action( 'rest_api_init', __NAMESPACE__ . '\\register_rest_routes' );
+add_action( 'rest_api_init', __NAMESPACE__ . '\\register_rest_query_filters' );
 add_filter( 'rest_query_vars', __NAMESPACE__ . '\\add_rest_query_vars' );
 add_action( 'admin_init', __NAMESPACE__ . '\\ensure_current_user_on_site' );
 add_filter( 'register_taxonomy_args', __NAMESPACE__ . '\\modify_user_group_taxonomy_args', 10, 2 );
@@ -49,7 +50,6 @@ add_action( 'pre_get_posts', __NAMESPACE__ . '\\modify_user_group_archive_query'
 
 // Filter Query Loop block query to support author/group filtering in both frontend and block editor.
 add_filter( 'query_loop_block_query_vars', __NAMESPACE__ . '\\modify_query_loop_block_query', 10, 3 );
-add_filter( 'rest_post_query', __NAMESPACE__ . '\\modify_rest_query_for_editor', 10, 2 );
 
 /**
  * Enqueues the necessary scripts and styles for the Block Editor.
@@ -210,6 +210,27 @@ function register_rest_routes() {
 			},
 		)
 	);
+}
+
+/**
+ * Registers REST API query filters for all supported post types.
+ *
+ * WordPress uses different REST query filters for each post type:
+ * - rest_post_query for posts
+ * - rest_page_query for pages
+ * - rest_{$post_type}_query for custom post types
+ *
+ * This function dynamically registers the filter for all supported post types.
+ *
+ * @return void
+ */
+function register_rest_query_filters() {
+	$post_types = get_supported_post_types();
+
+	foreach ( $post_types as $post_type ) {
+		$filter_name = "rest_{$post_type}_query";
+		add_filter( $filter_name, __NAMESPACE__ . '\\modify_rest_query_for_editor', 10, 2 );
+	}
 }
 
 /**
@@ -762,7 +783,7 @@ function enqueue_query_loop_filter_script() {
 function modify_query_loop_block_query( $query_args, $block, $page ) {
 	// Unused parameter - kept for filter signature compatibility.
 	unset( $page );
-	
+
 	// In WordPress 6.9, block attributes are accessed via $block->attributes.
 	$block_attributes = isset( $block->attributes ) ? $block->attributes : array();
 	$query_attr = isset( $block_attributes['query'] ) ? $block_attributes['query'] : array();
@@ -904,7 +925,7 @@ function modify_query_loop_block_query( $query_args, $block, $page ) {
 function modify_rest_query_for_editor( $args, $request ) {
 	// Check if the filter parameter is in the request.
 	$filter_value = $request->get_param( 'wpAuthorsAndGroupsFilter' );
-	
+
 	if ( empty( $filter_value ) ) {
 		return $args;
 	}
