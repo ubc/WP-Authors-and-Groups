@@ -5,8 +5,8 @@
     "main": "index.js",
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1",
-        "start": "wp-scripts start js/editor.js",
-        "build": "wp-scripts build js/editor.js"
+        "start": "wp-scripts start js/post-editor-settings.js js/query-loop-filter.js",
+        "build": "wp-scripts build js/post-editor-settings.js js/query-loop-filter.js"
     },
     "author": "Kelvin Xu",
     "license": "GPL-2.0-only",
