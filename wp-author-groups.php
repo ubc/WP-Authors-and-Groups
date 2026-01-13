@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // Define supported post types. Default to 'post' only.
 if ( ! defined( 'WP_AUTHORS_AND_GROUPS_POST_TYPES' ) ) {
-	define( 'WP_AUTHORS_AND_GROUPS_POST_TYPES', array( 'post' ) );
+	define( 'WP_AUTHORS_AND_GROUPS_POST_TYPES', array( 'post', 'page' ) );
 }
 
 // Load helper functions.
