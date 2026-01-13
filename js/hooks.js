@@ -248,7 +248,8 @@ export const useCombinedChange = () => {
 
 /**
  * Custom hook to set default author when both users and groups are empty.
- * Selects the current logged-in user as default.
+ * For new posts: selects the current logged-in user as default.
+ * For existing posts: only selects current user if original author matches current user.
  *
  * @return {void}
  */
@@ -264,6 +265,7 @@ export const useDefaultAuthor = () => {
 		const currentMeta = registry.select('core/editor').getEditedPostAttribute('meta');
 		const currentAuthor = registry.select('core/editor').getEditedPostAttribute('author');
 		const currentPostId = registry.select('core/editor').getCurrentPostId();
+		const currentPost = registry.select('core/editor').getCurrentPost();
 
 		// Don't run if we don't have author or postId
 		if (!currentAuthor || !currentPostId) {
@@ -282,15 +284,24 @@ export const useDefaultAuthor = () => {
 		if (metaUsers.length === 0 && metaGroups.length === 0) {
 			const setDefaultSelection = async () => {
 				try {
-					// Get the current logged-in user (not the post author)
+					// Get the current logged-in user
 					const currentUser = await apiFetch({
 						path: '/wp/v2/users/me',
 					});
 					
 					const currentUserId = currentUser?.id;
 					
-					// Select the current logged-in user as default
-					if (currentUserId) {
+					if (!currentUserId) {
+						return; // Can't proceed without current user
+					}
+
+					// Check if it's a new post (post ID is 0 or status is 'auto-draft')
+					const isNewPost = !currentPostId || 
+						currentPostId === 0 || 
+						(currentPost?.status === 'auto-draft');
+
+					if (isNewPost) {
+						// New post: default select current user
 						const newMeta = {
 							...currentMeta,
 							wp_authors_and_groups_selected_users: [currentUserId],
@@ -300,31 +311,26 @@ export const useDefaultAuthor = () => {
 							meta: newMeta,
 						});
 					} else {
-						// Fallback to post author if current user is not available
-						const authorId = parseInt(currentAuthor, 10);
-						if (authorId && !isNaN(authorId)) {
+						// Existing post: get original author from post object
+						const originalAuthorId = currentPost?.author || currentAuthor;
+						const originalAuthorIdInt = parseInt(originalAuthorId, 10);
+						
+						// Only select current user if original author matches current user
+						if (originalAuthorIdInt === currentUserId) {
 							const newMeta = {
 								...currentMeta,
-								wp_authors_and_groups_selected_users: [authorId],
-								wp_authors_and_groups_selected_order: [`user-${authorId}`],
+								wp_authors_and_groups_selected_users: [currentUserId],
+								wp_authors_and_groups_selected_order: [`user-${currentUserId}`],
 							};
-							editPost({ meta: newMeta });
+							editPost({
+								meta: newMeta,
+							});
 						}
+						// Otherwise, leave dropdown empty (don't set anything)
 					}
 				} catch (error) {
-					// If API call fails, fall back to selecting post author
-					const authorId = parseInt(currentAuthor, 10);
-					
-					if (authorId && !isNaN(authorId)) {
-						const newMeta = {
-							...currentMeta,
-							wp_authors_and_groups_selected_users: [authorId],
-							wp_authors_and_groups_selected_order: [`user-${authorId}`],
-						};
-						editPost({
-							meta: newMeta,
-						});
-					}
+					// If API call fails, silently fail (don't set default)
+					// This ensures we don't accidentally set wrong defaults
 				}
 			};
 
