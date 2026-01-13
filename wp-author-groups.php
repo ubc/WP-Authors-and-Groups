@@ -28,7 +28,7 @@ if ( ! defined( 'WP_AUTHORS_AND_GROUPS_POST_TYPES' ) ) {
 // Load helper functions.
 require_once plugin_dir_path( __FILE__ ) . 'includes/helper.php';
 
-add_action( 'enqueue_block_editor_assets', __NAMESPACE__ . '\\enqueue_scripts', 99 );
+add_action( 'enqueue_block_editor_assets', __NAMESPACE__ . '\\enqueue_post_editor_setting_scripts', 99 );
 add_action( 'enqueue_block_editor_assets', __NAMESPACE__ . '\\enqueue_query_loop_filter_script', 99 );
 add_action( 'init', __NAMESPACE__ . '\\register_meta_fields' );
 add_action( 'rest_api_init', __NAMESPACE__ . '\\register_rest_routes' );
@@ -47,10 +47,8 @@ add_action( 'pre_get_posts', __NAMESPACE__ . '\\modify_author_archive_query' );
 // Modify user group archive query to include posts assigned via meta.
 add_action( 'pre_get_posts', __NAMESPACE__ . '\\modify_user_group_archive_query' );
 
-// Filter Query Loop block query to support author/group filtering.
+// Filter Query Loop block query to support author/group filtering in both frontend and block editor.
 add_filter( 'query_loop_block_query_vars', __NAMESPACE__ . '\\modify_query_loop_block_query', 10, 3 );
-
-// Filter REST API queries for editor previews (WordPress 6.9+).
 add_filter( 'rest_post_query', __NAMESPACE__ . '\\modify_rest_query_for_editor', 10, 2 );
 
 /**
@@ -61,7 +59,7 @@ add_filter( 'rest_post_query', __NAMESPACE__ . '\\modify_rest_query_for_editor',
  *
  * @return void
  */
-function enqueue_scripts() {
+function enqueue_post_editor_setting_scripts() {
 	// Only enqueue for supported post types.
 	$screen = get_current_screen();
 	if ( ! $screen || ! is_post_type_supported( $screen->post_type ) ) {
