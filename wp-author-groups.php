@@ -38,6 +38,7 @@ add_action( 'admin_init', __NAMESPACE__ . '\\ensure_current_user_on_site' );
 add_filter( 'register_taxonomy_args', __NAMESPACE__ . '\\modify_user_group_taxonomy_args', 10, 2 );
 add_filter( 'the_author', __NAMESPACE__ . '\\filter_author_display', 10, 1 );
 add_filter( 'get_the_author_display_name', __NAMESPACE__ . '\\filter_author_display', 10, 2 );
+add_filter( 'get_avatar', __NAMESPACE__ . '\\filter_avatar', 10, 6 );
 
 // Filter the author posts link.
 add_filter( 'author_link', __NAMESPACE__ . '\\filter_author_link', 10, 1 );
@@ -323,17 +324,23 @@ function ensure_current_user_on_site() {
  * @param int $post_id Post ID.
  * @return string Comma-separated list of author and group names, or empty string if none assigned.
  */
-function get_formatted_authors_and_groups( $post_id ) {
+/**
+ * Gets configured authors and groups for a post in order.
+ *
+ * @param int $post_id Post ID.
+ * @return array Array of configuration items. Each item is array( 'type' => 'user'|'group', 'id' => int ).
+ */
+function get_post_authors_configuration( $post_id ) {
 	$post_id = absint( $post_id );
 
 	if ( ! $post_id ) {
-		return '';
+		return array();
 	}
 
 	// Check if post type is supported.
 	$post_type = get_post_type( $post_id );
 	if ( ! $post_type || ! is_post_type_supported( $post_type ) ) {
-		return '';
+		return array();
 	}
 
 	// Get meta values.
@@ -346,12 +353,12 @@ function get_formatted_authors_and_groups( $post_id ) {
 	$selected_groups = is_array( $selected_groups ) ? $selected_groups : array();
 	$selected_order  = is_array( $selected_order ) ? $selected_order : array();
 
-	// If no selections, return empty string.
+	// If no selections, return empty array.
 	if ( empty( $selected_users ) && empty( $selected_groups ) ) {
-		return '';
+		return array();
 	}
 
-	$names = array();
+	$items = array();
 
 	// If we have stored order, use it to maintain the order.
 	if ( ! empty( $selected_order ) ) {
@@ -359,32 +366,69 @@ function get_formatted_authors_and_groups( $post_id ) {
 			if ( strpos( $prefixed_value, 'user-' ) === 0 ) {
 				$user_id = absint( str_replace( 'user-', '', $prefixed_value ) );
 				if ( $user_id && in_array( $user_id, $selected_users, true ) ) {
-					$name = get_user_display_name( $user_id );
-					if ( $name ) {
-						$names[] = $name;
-					}
+					$items[] = array(
+						'type' => 'user',
+						'id'   => $user_id,
+					);
 				}
 			} elseif ( strpos( $prefixed_value, 'group-' ) === 0 ) {
 				$group_id = absint( str_replace( 'group-', '', $prefixed_value ) );
 				if ( $group_id && in_array( $group_id, $selected_groups, true ) ) {
-					$name = get_group_name( $group_id );
-					if ( $name ) {
-						$names[] = $name;
-					}
+					$items[] = array(
+						'type' => 'group',
+						'id'   => $group_id,
+					);
 				}
 			}
 		}
-	} else {
-		// Fallback: groups first, then users.
-		foreach ( $selected_groups as $group_id ) {
-			$name = get_group_name( $group_id );
+		return $items;
+	}
+
+	// Fallback: groups first, then users.
+	foreach ( $selected_groups as $group_id ) {
+		$items[] = array(
+			'type' => 'group',
+			'id'   => $group_id,
+		);
+	}
+
+	foreach ( $selected_users as $user_id ) {
+		$items[] = array(
+			'type' => 'user',
+			'id'   => $user_id,
+		);
+	}
+
+	return $items;
+}
+
+/**
+ * Gets formatted author and group names for a post.
+ *
+ * Retrieves the assigned users and groups for a post and formats them as a
+ * readable string (e.g., "John Doe and Jane Smith" or "Group A, Group B and John Doe").
+ * Respects the stored order if available, otherwise displays groups first, then users.
+ *
+ * @param int $post_id Post ID.
+ * @return string Comma-separated list of author and group names, or empty string if none assigned.
+ */
+function get_formatted_authors_and_groups( $post_id ) {
+	$items = get_post_authors_configuration( $post_id );
+
+	if ( empty( $items ) ) {
+		return '';
+	}
+
+	$names = array();
+
+	foreach ( $items as $item ) {
+		if ( 'user' === $item['type'] ) {
+			$name = get_user_display_name( $item['id'] );
 			if ( $name ) {
 				$names[] = $name;
 			}
-		}
-
-		foreach ( $selected_users as $user_id ) {
-			$name = get_user_display_name( $user_id );
+		} elseif ( 'group' === $item['type'] ) {
+			$name = get_group_name( $item['id'] );
 			if ( $name ) {
 				$names[] = $name;
 			}
@@ -446,6 +490,97 @@ function filter_author_display( $display_name ) {
 }
 
 /**
+ * Filters the avatar to show assigned users' avatars.
+ *
+ * Replaces the default author avatar with the avatars of assigned users.
+ * Groups are currently disabled as they do not have avatars.
+ *
+ * @param string $avatar      Image tag for the user's avatar.
+ * @param mixed  $id_or_email The user object, email address, or ID.
+ * @param int    $size        Square avatar width and height in pixels.
+ * @param string $default_url URL for the default image or a default type.
+ * @param string $alt         Alternative text to use in the avatar image tag.
+ * @param array  $args        Arguments passed to get_avatar_data(), after processing.
+ * @return string Modified avatar string.
+ */
+function filter_avatar( $avatar, $id_or_email, $size, $default_url, $alt, $args ) {
+	global $post;
+
+	// If no post, don't modify.
+	if ( ! $post || ! isset( $post->ID ) ) {
+		return $avatar;
+	}
+
+	// Check if post type is supported.
+	if ( ! is_post_type_supported( $post->post_type ) ) {
+		return $avatar;
+	}
+
+	// On author archive pages, only apply if we're in the loop (displaying posts).
+	if ( is_author() && ! in_the_loop() ) {
+		return $avatar;
+	}
+
+	// Verify $id_or_email matches $post->post_author.
+	$user_id = 0;
+	if ( is_numeric( $id_or_email ) ) {
+		$user_id = (int) $id_or_email;
+	} elseif ( is_string( $id_or_email ) && is_email( $id_or_email ) ) {
+		$user = get_user_by( 'email', $id_or_email );
+		if ( $user ) {
+			$user_id = $user->ID;
+		}
+	} elseif ( is_object( $id_or_email ) ) {
+		if ( ! empty( $id_or_email->user_id ) ) {
+			$user_id = (int) $id_or_email->user_id;
+		} elseif ( ! empty( $id_or_email->ID ) ) {
+			$user_id = (int) $id_or_email->ID;
+		}
+	}
+
+	// If the avatar request is not for the post author, return original.
+	if ( ! $user_id || $user_id !== (int) $post->post_author ) {
+		return $avatar;
+	}
+
+	// Get assigned authors.
+	$items = get_post_authors_configuration( $post->ID );
+
+	if ( empty( $items ) ) {
+		return $avatar;
+	}
+
+	$avatars = '';
+
+	// Temporarily remove this filter to avoid recursion.
+	remove_filter( 'get_avatar', __NAMESPACE__ . '\\filter_avatar', 10 );
+
+	foreach ( $items as $item ) {
+		// Clean args to prevent previous user's data (like 'url') from polluting the new call.
+		$new_args = $args;
+		if ( is_array( $new_args ) ) {
+			unset( $new_args['url'], $new_args['found_avatar'] );
+		}
+
+		if ( 'user' === $item['type'] ) {
+			// Use the user's display name as alt text.
+			$user_alt = get_user_display_name( $item['id'] );
+			$avatars .= get_avatar( $item['id'], $size, $default_url, $user_alt, $new_args );
+		}
+		// Skip groups for now as they don't have avatars.
+	}
+
+	// Re-add filter.
+	add_filter( 'get_avatar', __NAMESPACE__ . '\\filter_avatar', 10, 6 );
+
+	if ( ! empty( $avatars ) ) {
+		return $avatars;
+	}
+
+	return $avatar;
+}
+
+/**
  * Filters the author posts link to use the first assigned user or group.
  *
  * Modifies author links to point to the archive page of the first assigned user
@@ -471,69 +606,28 @@ function filter_author_link( $link ) {
 		return $link;
 	}
 
-	// Check if post type is supported.
-	$post_type = get_post_type( $post_id );
-	if ( ! $post_type || ! is_post_type_supported( $post_type ) ) {
+	$items = get_post_authors_configuration( $post_id );
+
+	if ( empty( $items ) ) {
 		$filtering = false;
 		return $link;
 	}
 
-	$selected_users  = get_post_meta( $post_id, 'wp_authors_and_groups_selected_users', true );
-	$selected_groups = get_post_meta( $post_id, 'wp_authors_and_groups_selected_groups', true );
-	$selected_order  = get_post_meta( $post_id, 'wp_authors_and_groups_selected_order', true );
+	$first_item = $items[0];
+	$result     = $link;
 
-	// Ensure arrays.
-	$selected_users  = is_array( $selected_users ) ? $selected_users : array();
-	$selected_groups = is_array( $selected_groups ) ? $selected_groups : array();
-	$selected_order  = is_array( $selected_order ) ? $selected_order : array();
-
-	$result = $link;
-
-	// If we have stored order, use it to get the first item (respects user/group order).
-	if ( ! empty( $selected_order ) ) {
-		$first_item = $selected_order[0];
-		if ( strpos( $first_item, 'user-' ) === 0 ) {
-			// First item is a user - return user's author archive link.
-			$user_id = absint( str_replace( 'user-', '', $first_item ) );
-			if ( $user_id && in_array( $user_id, $selected_users, true ) ) {
-				remove_filter( 'author_link', __NAMESPACE__ . '\\filter_author_link', 10 );
-				$result = get_author_posts_url( $user_id );
-				add_filter( 'author_link', __NAMESPACE__ . '\\filter_author_link', 10, 1 );
-				$filtering = false;
-				return $result;
-			}
-		} elseif ( strpos( $first_item, 'group-' ) === 0 ) {
-			// First item is a group - return group's term archive link.
-			$group_id = absint( str_replace( 'group-', '', $first_item ) );
-			if ( $group_id && in_array( $group_id, $selected_groups, true ) ) {
-				$term_link = get_term_link( $group_id, 'user-group' );
-				if ( ! is_wp_error( $term_link ) ) {
-					$result    = $term_link;
-					$filtering = false;
-					return $result;
-				}
-			}
-		}
-	}
-
-	// Fallback: if no order stored, use groups first, then users (matching get_formatted_authors_and_groups).
-	if ( $result === $link && ! empty( $selected_groups ) ) {
-		$term_link = get_term_link( $selected_groups[0], 'user-group' );
+	if ( 'user' === $first_item['type'] ) {
+		// remove_filter/add_filter not strictly needed due to static guard, but keeping it explicit doesn't hurt.
+		// However, trusting the static guard simplifies this.
+		$result = get_author_posts_url( $first_item['id'] );
+	} elseif ( 'group' === $first_item['type'] ) {
+		$term_link = get_term_link( $first_item['id'], 'user-group' );
 		if ( ! is_wp_error( $term_link ) ) {
 			$result = $term_link;
-			$filtering = false;
-			return $result;
 		}
-	}
-
-	if ( $result === $link && ! empty( $selected_users ) ) {
-		remove_filter( 'author_link', __NAMESPACE__ . '\\filter_author_link', 10 );
-		$result = get_author_posts_url( $selected_users[0] );
-		add_filter( 'author_link', __NAMESPACE__ . '\\filter_author_link', 10, 1 );
 	}
 
 	$filtering = false;
-
 	return $result;
 }
 
@@ -688,8 +782,6 @@ function modify_user_group_archive_query( $query ) {
 
 	// Get post IDs where group is in selected_groups meta.
 	// Query directly to handle both serialized arrays and multiple meta entries.
-	// Serialized array format: a:2:{i:0;i:1;i:1;i:200;}
-	// We need to match the value part: ;i:1; (semicolon before ensures it's a value, not an index).
 	$group_meta_posts = $wpdb->get_col(
 		$wpdb->prepare(
 			"SELECT DISTINCT pm.post_id 
