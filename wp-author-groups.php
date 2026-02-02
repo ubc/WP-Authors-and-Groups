@@ -483,15 +483,9 @@ function filter_avatar( $avatar, $id_or_email, $size, $default_url, $alt, $args 
 		return $avatar;
 	}
 
-	//error_log(print_r($post, true));
-
 	// Check if post type is supported.
 	if ( ! is_post_type_supported( $post->post_type ) ) {
 		return $avatar;
-	}
-
-	if ( in_the_loop() ) {
-		error_log('in the loop');
 	}
 
 	// On author archive pages, only apply if we're in the loop (displaying posts).
