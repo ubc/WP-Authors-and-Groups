@@ -155,9 +155,10 @@ addFilter(
 const withForceServerRender = (BlockEdit) => {
 	return (props) => {
 		const { name, attributes } = props;
+		const serverRenderBlocks = ['core/post-author', 'core/post-author-name'];
 
 		// Only apply to Post Author block
-		if (name !== 'core/post-author') {
+		if (!serverRenderBlocks.includes(name)) {
 			return <BlockEdit {...props} />;
 		}
 
@@ -166,7 +167,7 @@ const withForceServerRender = (BlockEdit) => {
 		return (
 			<div {...blockProps}>
 				<ServerSideRender
-					block="core/post-author"
+					block={name}
 					attributes={attributes}
 				/>
 			</div>
