@@ -7,9 +7,11 @@
  * @package wp-authors-and-groups
  */
 
+import ServerSideRender from '@wordpress/server-side-render';
+
 const { addFilter } = wp.hooks;
 const { PanelBody, SelectControl } = wp.components;
-const { InspectorControls } = wp.blockEditor;
+const { InspectorControls, useBlockProps } = wp.blockEditor;
 const { __ } = wp.i18n;
 const { useEffect, useState, useMemo } = wp.element;
 const apiFetch = wp.apiFetch;
@@ -20,7 +22,7 @@ const apiFetch = wp.apiFetch;
  * @param {Object} BlockEdit Original block edit component.
  * @return {Object} Enhanced block edit component with author filter.
  */
-const withAuthorFilter = (BlockEdit) => {
+const withAuthorFilterOnQueryLoop = (BlockEdit) => {
 	return (props) => {
 		const { attributes, setAttributes, name } = props;
 
@@ -141,5 +143,40 @@ const withAuthorFilter = (BlockEdit) => {
 addFilter(
 	'editor.BlockEdit',
 	'wp-authors-and-groups/query-loop-filter',
-	withAuthorFilter
+	withAuthorFilterOnQueryLoop
+);
+
+/**
+ * Forces some of the core blocks to render on the server.
+ *
+ * @param {Object} BlockEdit Original block edit component.
+ * @return {Object} Enhanced block edit component with author filter.
+ */
+const withForceServerRender = (BlockEdit) => {
+	return (props) => {
+		const { name, attributes } = props;
+
+		// Only apply to Post Author block
+		if (name !== 'core/post-author') {
+			return <BlockEdit {...props} />;
+		}
+
+		const blockProps = useBlockProps();
+
+		return (
+			<div {...blockProps}>
+				<ServerSideRender
+					block="core/post-author"
+					attributes={attributes}
+				/>
+			</div>
+		);
+	};
+};
+
+// Register the filter
+addFilter(
+	'editor.BlockEdit',
+	'wp-authors-and-groups/force-server-render',
+	withForceServerRender
 );

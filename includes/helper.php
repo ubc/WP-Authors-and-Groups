@@ -22,8 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * @return array Array of supported post type slugs.
  */
 function get_supported_post_types() {
-	$post_types = WP_AUTHORS_AND_GROUPS_POST_TYPES;
-	return is_array( $post_types ) ? $post_types : array( 'post' );
+	return  defined( 'WP_AUTHORS_AND_GROUPS_POST_TYPES' ) && is_array( WP_AUTHORS_AND_GROUPS_POST_TYPES ) ? WP_AUTHORS_AND_GROUPS_POST_TYPES : array( 'post', 'page' );
 }
 
 /**

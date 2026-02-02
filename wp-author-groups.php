@@ -20,16 +20,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-// Define supported post types. Default to 'post' only.
-if ( ! defined( 'WP_AUTHORS_AND_GROUPS_POST_TYPES' ) ) {
-	define( 'WP_AUTHORS_AND_GROUPS_POST_TYPES', array( 'post', 'page' ) );
-}
-
 // Load helper functions.
 require_once plugin_dir_path( __FILE__ ) . 'includes/helper.php';
 
-add_action( 'enqueue_block_editor_assets', __NAMESPACE__ . '\\enqueue_post_editor_setting_scripts', 99 );
-add_action( 'enqueue_block_editor_assets', __NAMESPACE__ . '\\enqueue_query_loop_filter_script', 99 );
+add_action( 'enqueue_block_editor_assets', __NAMESPACE__ . '\\enqueue_block_editor_assets', 99 );
 add_action( 'init', __NAMESPACE__ . '\\register_meta_fields' );
 add_action( 'rest_api_init', __NAMESPACE__ . '\\register_rest_routes' );
 add_action( 'rest_api_init', __NAMESPACE__ . '\\register_rest_query_filters' );
@@ -60,7 +54,7 @@ add_filter( 'query_loop_block_query_vars', __NAMESPACE__ . '\\modify_query_loop_
  *
  * @return void
  */
-function enqueue_post_editor_setting_scripts() {
+function enqueue_block_editor_assets() {
 	// Only enqueue for supported post types.
 	$screen = get_current_screen();
 	if ( ! $screen || ! is_post_type_supported( $screen->post_type ) ) {
@@ -70,28 +64,19 @@ function enqueue_post_editor_setting_scripts() {
 	$plugin_dir_path = plugin_dir_path( __FILE__ );
 	$plugin_dir_url  = plugin_dir_url( __FILE__ );
 
-	// Enqueue editor script.
-	$editor_js_path = $plugin_dir_path . 'build/post-editor-settings.js';
-	$editor_js_url  = $plugin_dir_url . 'build/post-editor-settings.js';
-	if ( file_exists( $editor_js_path ) ) {
+	// Enqueue post editor settings script.
+	if ( file_exists( $plugin_dir_path . 'build/post-editor-settings.js' ) ) {
 		wp_enqueue_script(
-			'wp-authors-and-groups-script',
-			$editor_js_url,
-			array(
-				'wp-plugins',
-				'wp-edit-post',
-				'wp-data',
-				'wp-element',
-				'wp-i18n',
-				'wp-api-fetch',
-			),
-			filemtime( $editor_js_path ),
+			'wp-authors-and-groups-post-editor-settings',
+			$plugin_dir_url . 'build/post-editor-settings.js',
+			array(),
+			filemtime( $plugin_dir_path . 'build/post-editor-settings.js' ),
 			true
 		);
 
 		// Pass supported post types to JavaScript for conditional rendering.
 		wp_localize_script(
-			'wp-authors-and-groups-script',
+			'wp-authors-and-groups-post-editor-settings',
 			'wpAuthorsAndGroups',
 			array(
 				'supportedPostTypes' => get_supported_post_types(),
@@ -99,27 +84,14 @@ function enqueue_post_editor_setting_scripts() {
 		);
 	}
 
-	// Enqueue editor styles.
-	$editor_css_path = $plugin_dir_path . 'build/editor.css';
-	$editor_css_url  = $plugin_dir_url . 'build/editor.css';
-	if ( file_exists( $editor_css_path ) ) {
-		wp_enqueue_style(
-			'wp-authors-and-groups-style',
-			$editor_css_url,
+	// Enqueue Block Filters script.
+	if ( file_exists( $plugin_dir_path . 'build/block-filters.js' ) ) {
+		wp_enqueue_script(
+			'wp-authors-and-groups-block-filters',
+			$plugin_dir_url . 'build/block-filters.js',
 			array(),
-			filemtime( $editor_css_path )
-		);
-	}
-
-	// Enqueue additional editor styles.
-	$additional_css_path = $plugin_dir_path . 'css/editor.css';
-	$additional_css_url  = $plugin_dir_url . 'css/editor.css';
-	if ( file_exists( $additional_css_path ) ) {
-		wp_enqueue_style(
-			'wp-authors-and-groups-editor-style',
-			$additional_css_url,
-			array(),
-			filemtime( $additional_css_path )
+			filemtime( $plugin_dir_path . 'build/block-filters.js' ),
+			true
 		);
 	}
 }
@@ -511,9 +483,15 @@ function filter_avatar( $avatar, $id_or_email, $size, $default_url, $alt, $args 
 		return $avatar;
 	}
 
+	//error_log(print_r($post, true));
+
 	// Check if post type is supported.
 	if ( ! is_post_type_supported( $post->post_type ) ) {
 		return $avatar;
+	}
+
+	if ( in_the_loop() ) {
+		error_log('in the loop');
 	}
 
 	// On author archive pages, only apply if we're in the loop (displaying posts).
@@ -823,40 +801,6 @@ function modify_user_group_archive_query( $query ) {
 	} else {
 		// If no posts found, set to return nothing.
 		$query->set( 'post__in', array( 0 ) );
-	}
-}
-
-/**
- * Enqueues the Query Loop filter extension script.
- *
- * Loads the JavaScript file that extends the Query Loop block with
- * an author/group filter control.
- *
- * @return void
- */
-function enqueue_query_loop_filter_script() {
-	$plugin_dir_path = plugin_dir_path( __FILE__ );
-	$plugin_dir_url  = plugin_dir_url( __FILE__ );
-
-	// Enqueue Query Loop filter script.
-	$filter_js_path = $plugin_dir_path . 'build/query-loop-filter.js';
-	$filter_js_url  = $plugin_dir_url . 'build/query-loop-filter.js';
-	if ( file_exists( $filter_js_path ) ) {
-		wp_enqueue_script(
-			'wp-authors-and-groups-query-loop-filter',
-			$filter_js_url,
-			array(
-				'wp-hooks',
-				'wp-components',
-				'wp-block-editor',
-				'wp-data',
-				'wp-element',
-				'wp-i18n',
-				'wp-api-fetch',
-			),
-			filemtime( $filter_js_path ),
-			true
-		);
 	}
 }
 
